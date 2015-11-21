@@ -18,6 +18,13 @@ button {
 #fragranz_small > img {
   display: block;
 }
+#availableFragrances > li > img {
+  align-self: flex-start;
+}
+#fragranceDetail > li > img {
+  width: 100px;
+  align-self: flex-start;
+}
 #fragranceGenres > li > h3, #fragrancesGenreTitle , #backToGenre, #purchaseDetails span {
   text-transform: capitalize;
 }
