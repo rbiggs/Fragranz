@@ -98,3 +98,13 @@ button#shoppingCart > svg {
 #confirmationNum {
   text-transform: uppercase;
 }
+nav {
+  background-color: #d34057;
+}
+nav > h1 {
+  color: #fff;
+}
+button.back, #truck-back-arrow {
+  color: #fff;
+  stroke: #fff;
+}
