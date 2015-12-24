@@ -41,10 +41,14 @@
           this.array[i] = args[i];
         }
       } else if (args) {
-        var array = Array.prototype.slice.apply(arguments);
-        array.forEach(function(ctx, idx) {
-          this.array[idx] = ctx;
-        });
+        if (args === document) {
+          this.array[0] = document;
+        } else {
+          var array = Array.prototype.slice.apply(arguments);
+          array.forEach(function(ctx, idx) {
+            this.array[idx] = ctx;
+          });
+        }
       }
     }
 
@@ -343,7 +347,7 @@
         return selector;
       if (!context && typeof selector === 'string') {
         if (/<\/?[^>]+>/.test(selector)) {
-          return __this.make(selector);
+          return __this.html(selector);
         }
 
         if (tagRE.test(selector)) {
@@ -380,7 +384,7 @@
     }
 
     if (selector === document) {
-      return [document];
+      return new DOMStack(document);
     }
 
     if (selector === null) {
@@ -416,7 +420,7 @@
     } else if (typeof selector === 'string') {
       if (selector === '') return new DOMStack();
       if (/<\/?[^>]+>/.test(selector)) {
-        return Truck.make(selector);
+        return Truck.html(selector);
       } else {
         try {
           return getNode(selector) ? getNode(selector) : new DOMStack();
@@ -447,22 +451,26 @@
     return new DOMStack();
   }
   (function(Truck) {
-    Truck.extend = function(obj, prop, enumerable) {
-      enumerable = enumerable || false;
-      if (!prop) {
-        prop = obj;
-        obj = Truck;
+    Truck.extend = function(targetObject, sourceObject) {
+      // enumerable = enumerable || false;
+      if (!sourceObject) {
+        sourceObject = targetObject;
+        targetObject = Truck;
       }
-      Object.keys(prop).forEach(function(p) {
-        if (prop.hasOwnProperty(p)) {
-          Object.defineProperty(obj, p, {
-            value: prop[p],
+      for (var key in sourceObject) {
+        targetObject[key] = sourceObject[key];
+      }
+      /*Object.keys(sourceObject).forEach(function(p) {
+        if (sourceObject.hasOwnProperty(p)) {
+          Object.defineProperty(targetObject, p, {
+            value: sourceObject[p],
             writable: true,
             enumerable: enumerable,
             configurable: true
           });
         }
-      });
+      });*/
+
       return Truck;
     };
     Truck.fn = {
@@ -504,7 +512,7 @@
       });
     },
 
-    make: function(HTMLString) {
+    html: function(HTMLString) {
       var ret = new DOMStack();
       var temp;
 
@@ -551,10 +559,6 @@
       }
 
       return ret;
-    },
-
-    html: function(HTMLString) {
-      return $.make(HTMLString);
     },
 
     require: function(src, callback) {
@@ -728,8 +732,8 @@
     is: function(arg) {
       var ret = false;
       if (!this.size() || !arg) return;
-      if (!this.size())
-        return;
+      if (!this.size()) return;
+      var that = this;
       var __is = function(node, arg) {
         if (typeof arg === 'string') {
           var elements = Array.prototype.slice.apply(node.parentNode.querySelectorAll(arg));
@@ -739,7 +743,11 @@
             }
           }
         } else if (typeof arg === 'function') {
-          if (arg.call(this)) {
+          if (arg.call(that)) {
+            ret = true;
+          }
+        } else if (arg.constructor.toString().match(/DOMStack/)) {
+          if (node === arg[0]) {
             ret = true;
           }
         } else if (arg && arg.length) {
@@ -1085,8 +1093,8 @@
         return new DOMStack();
       }
       var __before = function(node, content) {
-        if (typeof content === 'string') {
-          content = $.make(content);
+        if (typeof content === 'string' || typeof content === 'number') {
+          content = $.html(content);
         }
         if (content && content.constructor.toString().match(/DOMStack/)) {
           var len = content.size();
@@ -1110,8 +1118,8 @@
       if (!this.size()) return new DOMStack();
       var __after = function(node, content) {
         var parent = node.parentNode;
-        if (typeof content === 'string') {
-          content = $.make(content);
+        if (typeof content === 'string' || typeof content === 'number') {
+          content = $.html(content);
         }
         if (content && content.constructor.toString().match(/DOMStack/)) {
           var i = 0,
@@ -1138,7 +1146,7 @@
     prepend: function(content) {
       if (!this.size()) return new DOMStack();
 
-      if (typeof content === 'string') {
+      if (typeof content === 'string' || typeof content === 'number') {
         this.forEach(function(element) {
           element.insertAdjacentHTML('afterbegin', content);
         });
@@ -1159,7 +1167,7 @@
     append: function(content) {
       if (!this.size()) return new DOMStack();
 
-      if (typeof content === 'string') {
+      if (typeof content === 'string' || typeof content === 'number') {
         this.forEach(function(element) {
           element.insertAdjacentHTML('beforeend', content);
         });
@@ -1214,7 +1222,7 @@
       var empNode;
       var whichClone;
       this.forEach(function(ctx) {
-        tempNode = $.make(string);
+        tempNode = $.html(string);
         empNode = tempNode.array[0];
         whichClone = $(ctx).clone(true);
         tempNode.append(whichClone);
@@ -1282,10 +1290,12 @@
         this.forEach(function(node) {
           node.innerHTML = '';
         });
+        return this;
       } else if (content) {
         this.forEach(function(node) {
           node.innerHTML = content;
         });
+        return this;
       } else if (!content) {
         return this.array[0].innerHTML.trim();
       }
@@ -1306,6 +1316,23 @@
         });
         return ret;
       }
+    },
+
+    replaceWith: function(content) {
+      var parent = this.parentNode;
+      if (content && content.nodeType && content.nodeType === 1) {
+        $(content).off();
+      } else if (content.constructor.toString().match(/DOMStack/)) {
+        content.off();
+      }
+      this.forEach(function(node) {
+        $(node).off();
+        if (typeof content === 'string') {
+          $.replace($(content), node);
+        } else {
+          $.replace($(content), node);
+        }
+      });
     },
 
     remove: function() {
@@ -1475,6 +1502,9 @@
 
     show: function() {
       var display = this.data('display_attr');
+      if (display === 'none' || !display) {
+        display = 'block';
+      }
       this.css('display', display);
     }
   });
@@ -1936,8 +1966,6 @@
 
     isAndroid: (/android/img.test(navigator.userAgent) && !/trident/img.test(navigator.userAgent)),
 
-    isWebOS: /webos/img.test(navigator.userAgent),
-
     isBlackberry: /blackberry/img.test(navigator.userAgent),
 
     isTouchEnabled: !/trident/img.test(navigator.userAgent) && !/edge/img.test(navigator.userAgent) && 'createTouch' in document,
@@ -1976,9 +2004,9 @@
   });
 
   $(function() {
-    //////////////////////////
+    //=======================
     // Setup Event Variables:
-    //////////////////////////
+    //=======================
     // Pointer events for IE10 and WP8:
     if (window.navigator.pointerEnabled) {
       $.eventStart = 'pointerdown';
@@ -2080,6 +2108,7 @@
         } else {
           if (!e.isPrimary) return;
         }
+        // Handle event if jQuery or not:
         e = e.originalEvent ? e.originalEvent : e;
         body.on('MSHoldVisual', function(e) {
           e.preventDefault();
@@ -2692,38 +2721,8 @@
           __array.reverse.apply(__array, arguments);
         },
 
-        indexOf: function(el, idx) {
-          var i = 0;
-          var len = __array.length;
-          var compareObjects = function(a, b) {
-            if (a === b)
-              return true;
-            for (var i in a) {
-              if (b.hasOwnProperty(i)) {
-                if (a[i] !== b[i]) return false;
-              } else {
-                return false;
-              }
-            }
-
-            for (var i in b) {
-              if (!a.hasOwnProperty(i)) {
-                return false;
-              }
-            }
-            return true;
-          };
-          for (; i < len; i++) {
-            if ($.type(el) === 'object') {
-              if (compareObjects(el, __array[i])) {
-                return i;
-              }
-            } else {
-              if (el === __array[i]) {
-                return i;
-              }
-            }
-          }
+        indexOf: function() {
+          return __array.indexOf.apply(this.array, arguments);
         },
 
         every: function() {
@@ -2797,7 +2796,7 @@
         }
       };
 
-      var propogateData = function(__handle, data, doNotPropogate) {
+      var propagateData = function(__handle, data, doNotPropogate) {
         if (!doNotPropogate) {
           propagateDataLoop(__handle, data);
         } else if (doNotPropogate && checkPublicationName(doNotPropogate) === 'string') {
@@ -2843,10 +2842,10 @@
           if (!__data) {
             __data = {};
             __data[prop] = value;
-            propogateData(__handle, __data, doNotPropogate);
+            propagateData(__handle, __data, doNotPropogate);
           } else {
             __data[prop] = value;
-            propogateData(__handle, __data, doNotPropogate);
+            propagateData(__handle, __data, doNotPropogate);
           }
           __lastModifiedTime = Date.now();
         },
@@ -2869,7 +2868,17 @@
           }
           __data = obj;
           __lastModifiedTime = Date.now();
-          propogateData(__handle, __data, doNotPropogate);
+          propagateData(__handle, __data, doNotPropogate);
+        },
+
+        // Merge new object into existing object.
+        // New properties will be added,
+        // existing properties will be updated.
+        mergeObject: function(obj, doNotPropogate) {
+          if (!obj || $.type(obj) !== 'object') return;
+          var temp = this.getData();
+          $.extend(temp, obj);
+          this.setObject(temp, doNotPropogate);
         },
 
         // Define push for collections.
@@ -2880,7 +2889,7 @@
           if (Array.isArray(__data)) {
             __data.push(data);
             __lastModifiedTime = Date.now();
-            propogateData(__handle, data, doNotPropogate);
+            propagateData(__handle, data, doNotPropogate);
             if (__autobox) {
               self.box({
                 key: __key
@@ -2896,7 +2905,7 @@
           if (this.hasData() && this.isIterable()) {
             var data = __data.pop();
             __lastModifiedTime = Date.now();
-            propogateData(__handle, data, doNotPropogate);
+            propagateData(__handle, data, doNotPropogate);
             if (__autobox) {
               self.box({
                 key: __key
@@ -2914,7 +2923,7 @@
           if (Array.isArray(__data)) {
             __data.unshift(data);
             __lastModifiedTime = Date.now();
-            propogateData(__handle, data, doNotPropogate);
+            propagateData(__handle, data, doNotPropogate);
             if (__autobox) {
               self.box({
                 key: __key
@@ -2930,7 +2939,7 @@
           if (this.hasData() && this.isIterable()) {
             var __d = __data.shift();
             __lastModifiedTime = Date.now();
-            propogateData(__handle, __d, doNotPropogate);
+            propagateData(__handle, __d, doNotPropogate);
             if (__autobox) {
               self.box({
                 key: __key
@@ -2948,7 +2957,7 @@
           if (Array.isArray(__data)) {
             __data = __data.concat(data);
             __lastModifiedTime = Date.now();
-            propogateData(__handle, __data, doNotPropogate);
+            propagateData(__handle, __data, doNotPropogate);
             if (__autobox) {
               self.box({
                 key: __key
@@ -2964,13 +2973,18 @@
           var self = this;
           if (this.hasData() && this.isIterable()) {
             var len = data.length;
-            __data.splice(position, 0, data);
-            __lastModifiedTime = Date.now();
-            propogateData(__handle, data, doNotPropogate);
-          } else {
-            __data.splice(position, 0, data);
-            __lastModifiedTime = Date.now();
-            propogateData(__handle, data, doNotPropogate);
+            // The position is greater than the collection,
+            // so add to end of collection:
+            if (position >= len - 1) {
+              __data.push(data);
+              __lastModifiedTime = Date.now();
+              propagateData(__handle, data, doNotPropogate);
+              // Otherwise insert it at the position:
+            } else {
+              __data.splice(position, 0, data);
+              __lastModifiedTime = Date.now();
+              propagateData(__handle, data, doNotPropogate);
+            }
           }
           if (__autobox) {
             self.box({
@@ -3125,7 +3139,7 @@
         // or an index of a collection;
         delete: function(data, doNotPropogate) {
           var pos;
-          if (!data) return;
+          if (data !== 0 && !data) return;
           var self = this;
           if (this.hasData() && this.isIterable()) {
             pos = __data.indexOf(data);
@@ -3135,7 +3149,7 @@
             __lastModifiedTime = Date.now();
             delete __data[data];
           }
-          propogateData(__handle, __data, doNotPropogate);
+          propagateData(__handle, __data, doNotPropogate);
           if (__autobox) {
             self.box({
               key: __key
@@ -3246,17 +3260,17 @@
             if (!isNaN(index) && value) {
               __data[index][prop] = value;
               __lastModifiedTime = Date.now();
-              propogateData(__handle, __data, doNotPropogate);
+              propagateData(__handle, __data, doNotPropogate);
             } else if (prop && !value) {
               // __data[index][prop];
               __data.splice(index, 1, prop);
               __lastModifiedTime = Date.now();
-              propogateData(__handle, __data, doNotPropogate);
+              propagateData(__handle, __data, doNotPropogate);
             }
           } else {
             __data[index] = prop;
             __lastModifiedTime = Date.now();
-            propogateData(__handle, __data, value);
+            propagateData(__handle, __data, value);
           }
           if (__autobox) {
             self.box({
@@ -3287,15 +3301,15 @@
             if (typeof prop === 'string') {
               __lastModifiedTime = Date.now();
               delete __data[index][prop];
-              propogateData(__handle, __data, doNotPropogate);
+              propagateData(__handle, __data, doNotPropogate);
             } else if (prop === true) {
               __lastModifiedTime = Date.now();
               __data.splice(index, 1);
-              propogateData(__handle, __data, prop);
+              propagateData(__handle, __data, prop);
             } else {
               __lastModifiedTime = Date.now();
               __data.splice(index, 1);
-              propogateData(__handle, __data, doNotPropogate);
+              propagateData(__handle, __data, doNotPropogate);
             }
           }
           if (__autobox) {
@@ -3313,8 +3327,7 @@
           /*
             options = {
               key: key,
-              boxName: name,
-              autosync: true
+              boxName: name
             }
           */
 
@@ -3521,6 +3534,57 @@
       };
     }
   });
+
+  //==================================
+  // Define dipatcher to run mediators
+  // using the provided handle:
+  //==================================
+  $.extend($.Mediator, {
+    dispatch: function(handle, data) {
+      var len = $.mediators[handle].size();
+      for (var k = 0; k < len; k++) {
+        var item = $.mediators[handle].eq(k);
+        if (item.exec === false && !item.time) {
+          continue;
+        } else {
+          // Handle stop after designated number of times:
+          if (item.stopAfter > 0 && item.exec) {
+            if (item.startFrom < item.stopAfter) {
+              item.count++;
+              item.startFrom++;
+              item.callback(data);
+              if (item.startFrom >= item.stopAfter) {
+                item.exec = false;
+                item.startFrom = 0;
+                item.stopAfter = 0;
+              }
+              break;
+            } else if (item.startFrom >= item.stopAfter) {
+              item.exec = false;
+              item.startFrom = 0;
+              item.stopAfter = 0;
+              break;
+            }
+
+            // Handle start after desinated time:
+          } else if (item.time && item.time > 0) {
+            if (item.time <= Date.now()) {
+              item.exec = true;
+            } else {
+              break;
+            }
+
+            // Otherwise just run it:
+          } else {
+            if (item.exec) {
+              item.count++;
+              item.callback(data);
+            }
+          }
+        }
+      }
+    }
+  });
 })();
 // Truck Engine - View Module:
 (function() {
@@ -3590,10 +3654,10 @@
       //////////////////////
       // Private Properties:
       //////////////////////
-      var __parent;
+      var __element;
       if (!options) options = {};
       if (options && options.element) {
-        __parent = $(options.element) || $();
+        __element = $(options.element) || $();
       }
       var $this = this;
       var __template = options.template;
@@ -3603,7 +3667,7 @@
       var __index = options.index || 1;
       var __rendered = false;
       var __variable = options.variable || 'data';
-      var __events = options.events;
+      var __events = options.events || [];
       var __isBoundTo = options.model;
       var __dontGetTemplate = options.noTemplate || false;
       var __startIndexFrom = options.startIndexFrom || false;
@@ -3618,10 +3682,11 @@
       var __renderCount = 0;
 
       var parentScreen = (function() {
-        if (__parent && __parent.closest('screen').size()) {
-          return __parent.closest('screen')[0].id;
+        if (__element && __element.closest('screen').size()) {
+          return __element.closest('screen')[0].id;
         }
       })();
+
       var pluck = function(stack, property) {
         var ret = [];
         if (stack.size()) {
@@ -3650,7 +3715,7 @@
       // Private Functions:
       ///////////////////
       var parseView = function(template, variable) {
-        var interpolate = /\$\{[^\\{]([\s\S]+?)\}/g;
+        var interpolate = /\$\{([\s\S]+?)\}/img;
         variable = variable || 'data';
         template.replace("'", "\'");
         /* jshint ignore:start */
@@ -3659,6 +3724,7 @@
           .replace(/[\r\t\n]/g, " ")
           .split("'").join("\\'")
           .replace(interpolate, "',$1,'")
+          // Executable:
           .split('{{').join("');")
           .split('}}').join("p.push('") + "');" +
           "return p.join('');");
@@ -3668,18 +3734,13 @@
 
       // Binding any events provided in View options:
       var handleEvents = function() {
-        if (!__events.length) {
-          if (__events.element === 'self' || !__events.element) {
-            __parent.on(options.events.event, __events.callback);
-          } else {
-            __parent.on(__events.event, __events.element, __events.callback);
-          }
-        } else {
+        if (!__element) return;
+        if (__events.length) {
           __events.forEach(function(item) {
-            if (item.element === 'self' || !item.element) {
-              __parent.on(item.event, item.callback);
+            if (item && item.element === 'self' || item && !item.element) {
+              __element.on(item.event, item.callback);
             } else {
-              __parent.on(item.event, item.element, item.callback);
+              __element.on(item.event, item.element, item.callback);
             }
           });
         }
@@ -3691,19 +3752,19 @@
 
       // Get template from element:
       var extractTemplate = function() {
-        if (!__parent || !__parent.size()) return;
+        if (!__element || !__element.size()) return;
         if (__dontGetTemplate) return;
         if (!__template) {
-          if (__parent.children()[0] && __parent.children().eq(0).is('script')) {
-            __template = __parent.children('script').html();
-            __parent.empty();
-          } else if (!__parent[0].childNodes) {
+          if (__element.children()[0] && __element.children().eq(0).is('script')) {
+            __template = __element.children('script').html();
+            __element.empty();
+          } else if (!__element[0].childNodes) {
             return;
           } else {
-            if (__parent[0] && __parent[0].childNodes) {
-              if (!__template) __template = __parent.html();
+            if (__element[0] && __element[0].childNodes) {
+              if (!__template) __template = __element.html();
             }
-            __parent.empty();
+            __element.empty();
           }
           if (__template) __template = __template.replace(__re, 'src');
 
@@ -3725,7 +3786,7 @@
       return {
 
         render: function(data, append) {
-          if (!__parent) return;
+          if (!__element) return;
           var $this = this;
           var __data = data;
 
@@ -3745,10 +3806,10 @@
           var renderIterableData = function(data) {
             if ($.type(data) === 'boolean') return;
             var Data = data ? data : __model;
-            __parent.removeClass('cloak');
-            if (__parent.data('index')) {
-              __index = Number(__parent.data('index'));
-              $.view.index = Number(__parent.data('index'));
+            __element.removeClass('cloak');
+            if (__element.data('index')) {
+              __index = Number(__element.data('index'));
+              $.view.index = Number(__element.data('index'));
             } else {
               __index = 1;
               $.view.index = 1;
@@ -3760,8 +3821,10 @@
           // Used by renderIterableData.
           // Loops over data to render template.
           // Handles index value as well.
-          var interateModelToTemplate = function(Data) {
-            __parent.empty();
+          var interateModelToTemplate = function(Data, append) {
+            if (!append) {
+              __element.empty();
+            }
             if (__startIndexFrom) $.view.index = __startIndexFrom;
             Data.forEach(function(item) {
               __index += 1;
@@ -3769,7 +3832,7 @@
                 item = $.escapeHTML(item);
               }
               if (parsedTemplate) {
-                __parent.append(parsedTemplate(item));
+                __element.append(parsedTemplate(item));
                 $.view.index += 1;
               } else if (__template) {
 
@@ -3784,13 +3847,13 @@
           var renderSingleObjectView = function(append) {
             __model.run(function(m, d) {
               if (!append) {
-                __parent.empty();
+                __element.empty();
               }
               if (__escapeHTML) {
                 d = $.escapeHTML(d);
               }
-              __parent.append(parsedTemplate(d)); // jshint ignore:line
-              __parent.removeClass('cloak');
+              __element.append(parsedTemplate(d)); // jshint ignore:line
+              __element.removeClass('cloak');
               __lastRenderTime = Date.now();
               __rendered = true;
               __renderCount++;
@@ -3824,24 +3887,32 @@
           // If the user supplied data to render:
           // If it's an array:
           if ($.type(data) === 'array') {
+            $.view.index = __startIndexFrom || 1;
             if (!__canRender) return;
-            __parent.empty();
+            if (!append) {
+              __element.empty();
+            }
             data.forEach(function(item) {
+              if (__escapeHTML) {
+                item = $.escapeHTML(item);
+              }
+              __element.append(parsedTemplate(item)); // jshint ignore:line
               $.view.index += 1;
               __index += 1;
-              __parent.append(parsedTemplate(item)); // jshint ignore:line
             });
             __rendered = true;
             $.view.index = 0;
-            __parent.removeClass('cloak');
+            __element.removeClass('cloak');
             return;
 
             // Else if it is an object:
-          } else if ($.type(data) === 'object') {
+          } else if ($.type(data) === 'object' || $.type(data) === 'string' || $.type(data) === 'number') {
             $.view.index = __startIndexFrom || 1;
-            __parent.empty();
-            __parent.append(parsedTemplate(data)); // jshint ignore:line
-            __parent.removeClass('cloak');
+            if (!append) {
+              __element.empty();
+            }
+            __element.append(parsedTemplate(data)); // jshint ignore:line
+            __element.removeClass('cloak');
             __rendered = true;
             return;
           }
@@ -3867,8 +3938,8 @@
               }
             }
 
-            // Is view was stoped with render limit:
-            // Check if set to stop after x times
+            // If view was stoped with render limit,
+            // check if set to stop after x times:
             if (__stopAfter > 0) {
 
               // If the limit not reached, render:
@@ -3904,29 +3975,23 @@
         },
 
         empty: function() {
-          if (!__parent) return;
-          __parent.empty();
+          if (!__element) return;
+          __element.empty();
         },
 
         resetIndex: function() {
-          if (!__parent) return;
+          if (!__element) return;
           __index = 0;
-          __parent.data('index', 0);
+          __element.data('index', 0);
           $.view.index = 0;
         },
 
         startIndexFrom: function(number) {
-          if (!__parent) return;
+          if (!__element) return;
           if (number === 0 || (number && !isNaN(number))) {
             __startIndexFrom = number;
             $.view.index = number;
             this.render();
-          }
-        },
-
-        beginFromIndex: function(yes) {
-          if (yes && !isNaN(yes)) {
-            $.view.index = yes;
           }
         },
 
@@ -3964,10 +4029,10 @@
         },
 
         isEmpty: function() {
-          if (!__parent) return;
-          if (typeof jQuery === 'undefined' && /DOMStack/img.test(__parent.constructor)) {
-            if (__parent.array[0].children.length) return false;
-          } else if (__parent[0].children.length) {
+          if (!__element) return;
+          if (typeof jQuery === 'undefined' && /DOMStack/img.test(__element.constructor)) {
+            if (__element.array[0].children.length) return false;
+          } else if (__element[0].children.length) {
             return false;
           } else {
             return true;
@@ -3981,10 +4046,10 @@
           var __v = this;
           __model = model;
           mediator.run(function(data) {
-            if (!__parent) return;
+            if (!__element) return;
             __v.render();
           });
-          if (!__parent) return;
+          if (!__element) return;
           this.render();
         },
 
@@ -3993,33 +4058,16 @@
           __model = undefined;
         },
 
-        addEvent: function(events, dontReplace) {
-          var eventsTemp;
-          if (!dontReplace) {
-            __events = events;
+        addEvent: function(events, replace) {
+          if (replace) {
+            __events = events & events.length ? events : [events];
           } else {
             if (events && events.length) {
-              if (__events && __events.length) {
-                events.forEach(function(event) {
-                  __events.push(event);
-                });
-              } else {
-                eventsTemp = [];
-                eventsTemp.push(__events);
-                events.forEach(function(event) {
-                  eventsTemp.push(event);
-                });
-                __events = eventsTemp;
-              }
-            } else {
-              if (__events && __events.length) {
-                __events.push(events);
-              } else {
-                eventsTemp = [];
-                eventsTemp.push(__events);
-                eventsTemp.push(event);
-                __events = eventsTemp;
-              }
+              events.forEach(function(event) {
+                __events.push(event)
+              });
+            } else if (events) {
+              __events.push(events);
             }
           }
           handleEvents();
@@ -4029,18 +4077,35 @@
           options: event, element (for a delegated event), callback
         */
         off: function(event, element, callback) {
-          __parent.off(event, element, callback);
+          __element.off(event, element, callback);
         },
 
+        getElement: function() {
+          return __element;
+        },
+
+        setElement: function(element) {
+          if (!element) return;
+          __element = $(element);
+          $(element).empty();
+          handleEvents();
+        },
+
+        // Old methods:
         getParent: function() {
-          return __parent;
+          return __element;
         },
 
         setParent: function(element) {
           if (!element) return;
-          __parent = $(element);
+          __element = $(element);
           $(element).empty();
+          handleEvents();
         },
+
+        // Aliases for old names:
+        setParent: this.setElement,
+        getParent: this.getParent,
 
         stop: function(after) {
           // Stop after x number of times:
@@ -4139,6 +4204,19 @@
         getRenderCount: function() {
           return __renderCount;
         }
+      };
+    }
+  });
+})();
+// Truck Engine - Component Module:
+(function() {
+  "use strict";
+  $.extend({
+    Component: function(options) {
+      $[options.name] = function() {
+        this.options = options;
+        delete this.options.name
+        return $.View(this.options);
       };
     }
   });
@@ -4260,10 +4338,17 @@
             return $.TruckRoutes.indexOf(route);
           },
 
-          delete: function(route) {
-            $.TruckRoutes.delete(route);
+          delete: function(route, baseRouteOnly) {
+            if (baseRouteOnly) {
+              $.TruckRoutes.delete(route);
+            } else {
+              $.TruckRoutes.forEach(function(r) {
+                if (r && route === r.split(':')[0]) {
+                  $.TruckRoutes.delete(r);
+                }
+              });
+            }
           }
-
         };
       }
     });
@@ -4380,7 +4465,7 @@
         }
         if (ret === chain.promise) {
           chain.reject(new TypeError("Promise-chain cycle"));
-        } else if (_then === isThenable(ret)) {
+        } else if (_then = isThenable(ret)) { // jshint ignore:line
           _then.call(ret, chain.resolve, chain.reject);
         } else {
           chain.resolve(ret);
@@ -4511,10 +4596,12 @@
   }
   var PromisePrototype = extend({}, "constructor", Promise, false);
   extend(Promise, "prototype", PromisePrototype, false);
+
   // Check if Promise is initialized:
   extend(PromisePrototype, "isValidPromise", 0, false);
   extend(Promise, "resolve", function(msg) {
     var Constructor = this;
+
     // Make sure it is a valide Promise:
     if (msg && typeof msg === "object" && msg.isValidPromise === 1) {
       return msg;
@@ -4536,6 +4623,7 @@
   });
   extend(Promise, "all", function(arr) {
     var Constructor = this;
+
     // Make sure argument is an array:
     if (Object.prototype.toString.call(arr) !== "[object Array]") {
       return Constructor.reject(new TypeError("Not an array"));
@@ -4547,9 +4635,9 @@
       if (typeof resolve !== "function" || typeof reject !== "function") {
         throw new TypeError("Not a function");
       }
-      var len = arr.length,
-        msgs = new Array(len),
-        count = 0;
+      var len = arr.length;
+      var msgs = new Array(len);
+      var count = 0;
       iteratePromises(Constructor, arr, function resolver(idx, msg) {
         msgs[idx] = msg;
         if (++count === len) {
@@ -4560,6 +4648,7 @@
   });
   extend(Promise, "race", function(arr) {
     var Constructor = this;
+
     // Make sure argument is an array:
     if (Object.prototype.toString.call(arr) !== "[object Array]") {
       return Constructor.reject(new TypeError("Not an array"));
@@ -4573,17 +4662,20 @@
       }, reject);
     });
   });
+
   // If native Promise exists in window, do not use this.
   if ("Promise" in window && "resolve" in window.Promise && "reject" in window.Promise && "all" in window.Promise && "race" in window.Promise) {
     return;
   } else {
+
     // Otherwise do use this:
     return window.Promise = Promise;
   }
 })();
-// Truck Engine - Fetch Module
+// Truck Engine - Fetch Module:
 (function(self) {
   'use strict';
+
   if (self.fetch) {
     return;
   }
@@ -4699,7 +4791,8 @@
         return false;
       }
     })(),
-    formData: 'FormData' in self
+    formData: 'FormData' in self,
+    arrayBuffer: 'ArrayBuffer' in self
   };
 
   function Body() {
@@ -4716,6 +4809,9 @@
         this._bodyFormData = body;
       } else if (!body) {
         this._bodyText = '';
+      } else if (support.arrayBuffer && ArrayBuffer.prototype.isPrototypeOf(body)) {
+        // Only support ArrayBuffers for POST method.
+        // Receiving ArrayBuffers happens via Blobs, instead.
       } else {
         throw new Error('unsupported BodyInit type');
       }
@@ -4854,6 +4950,7 @@
     if (!options) {
       options = {};
     }
+
     this._initBody(bodyInit);
     this.type = 'default';
     this.status = options.status;
@@ -4897,6 +4994,7 @@
       }
     });
   };
+
   self.Headers = Headers;
   self.Request = Request;
   self.Response = Response;
@@ -4963,6 +5061,7 @@
     });
   };
   self.fetch.polyfill = true;
+
   /**
    *
    * JSONP with API like fetch.
@@ -4982,6 +5081,7 @@
       }
       // Method to create callback:
       function generateCallbackName() {
+        var base = 'callback';
         var callbackName = settings.callbackName + '_' + ($.JSONPCallbacks.length + 1);
         $.JSONPCallbacks.push(callbackName);
         return callbackName;
@@ -5140,13 +5240,13 @@
   // Set validity state of form elements:
   var setValidityStatus = function(element, valid) {
     if (valid) {
-      element[0].valid = true;
-      element[0].invalid = false;
-      element.addClass('valid').removeClass('invalid');
+      $(element).prop('valid', true);
+      $(element).prop('invalid', false);
+      $(element).addClass('valid').removeClass('invalid');
     } else {
-      element[0].valid = false;
-      element[0].invalid = true;
-      element.addClass('invalid').removeClass('valid');
+      $(element).prop('valid', false);
+      $(element).prop('invalid', true);
+      $(element).addClass('invalid').removeClass('valid');
     }
   };
 
@@ -5397,6 +5497,20 @@
       } else {
         return false;
       }
+    },
+    validateMultiSelectList: function() {
+      var checkboxes = this.find('input[type=checkbox]');
+      var checked = false;
+      checkboxes.forEach(function(item) {
+        if ($(item).prop('checked')) {
+          checked = true;
+        }
+      });
+      if (checked) {
+        return true;
+      } else {
+        return false;
+      }
     }
   });
 
@@ -5426,8 +5540,18 @@
         return;
       }
       var value = $(input).val();
-      var re = new RegExp(regex);
-      return checkValidity(this, value.match(re));
+      if (value) {
+        return checkValidity(input, value.match(regex));
+      }
+    },
+
+    customValidators: [],
+
+    registerCustomValidator: function(name, regex) {
+      this.customValidators.push({
+        name: name,
+        regex: regex
+      });
     }
   });
 })();
@@ -7381,12 +7505,729 @@
   this.sessionStorageDriver = sessionStorageDriver;
   window.sessionStorageDriver = sessionStorageDriver;
 }).call(window);
+// Truck Engine - Animation Module:
+/* Inspired by Chuck Holloway's Move.JS */
+(function(self) {
+  $(function() {
+    function require(name) {
+      var module = require.modules[name];
+      if (!module) throw new Error('failed to require "' + name + '"');
+
+      if (!('exports' in module) && typeof module.definition === 'function') {
+        module.client = module.component = true;
+        module.definition.call(this, module.exports = {}, module);
+        delete module.definition;
+      }
+
+      return module.exports;
+    }
+
+    require.modules = {};
+
+    require.register = function(name, definition) {
+      require.modules[name] = {
+        definition: definition
+      };
+    };
+
+    require.define = function(name, exports) {
+      require.modules[name] = {
+        exports: exports
+      };
+    };
+
+    require.register("transformProperty", function(exports, module) {
+
+      var styles = [
+        'webkitTransform',
+        'MozTransform',
+        'msTransform',
+        'transform'
+      ];
+
+      var el = document.createElement('p');
+      var style;
+
+      for (var i = 0; i < styles.length; i++) {
+        style = styles[i];
+        if (null !== el.style[style]) {
+          module.exports = style;
+          break;
+        }
+      }
+    });
+
+    require.register("hasTranslate3d", function(exports, module) {
+
+      var prop = require('transformProperty');
+      var map = {
+        webkitTransform: '-webkit-transform',
+        msTransform: '-ms-transform',
+        MozTransform: '-moz-transform',
+        transform: 'transform'
+      };
+
+      var el = document.createElement('div');
+      el.style[prop] = 'translate3d(1px,1px,1px)';
+      document.body.insertBefore(el, null);
+      var val = getComputedStyle(el).getPropertyValue(map[prop]);
+      document.body.removeChild(el);
+      module.exports = null !== val && val.length && 'none' != val;
+    });
+
+    require.register("hasTransitions", function(exports, module) {
+
+      exports = module.exports = function(el) {
+        switch (arguments.length) {
+          case 0:
+            return bool;
+          case 1:
+            return bool ? transitions(el) : bool;
+        }
+      };
+
+      function transitions(el, styl) {
+        if (el.transition) return true;
+        styl = window.getComputedStyle(el);
+        return !!parseFloat(styl.transitionDuration, 10);
+      }
+
+      var styl = document.body.style;
+      var bool = 'transition' in styl || 'webkitTransition' in styl || 'MozTransition' in styl || 'msTransition' in styl;
+
+    });
+
+    require.register("componentEvents", function(exports, module) {
+      var bind = 'addEventListener';
+      var unbind = 'removeEventListener';
+      var prefix = bind !== 'addEventListener' ? 'on' : '';
+
+      exports.bind = function(el, type, fn, capture) {
+        el[bind](prefix + type, fn, capture || false);
+        return fn;
+      };
+
+      exports.unbind = function(el, type, fn, capture) {
+        el[unbind](prefix + type, fn, capture || false);
+        return fn;
+      };
+    });
+
+    require.register("cssEmitter", function(exports, module) {
+
+      var events = require('componentEvents');
+
+      // CSS events:
+
+      var watch = [
+        'transitionend', 'webkitTransitionEnd', 'MSTransitionEnd', 'animationend', 'webkitAnimationEnd', 'MSAnimationEnd'
+      ];
+
+      module.exports = CssEmitter;
+
+      function CssEmitter(element) {
+        if (!(this instanceof CssEmitter)) return new CssEmitter(element);
+        this.el = element;
+      }
+
+      CssEmitter.prototype.bind = function(fn) {
+        for (var i = 0; i < watch.length; i++) {
+          events.bind(this.el, watch[i], fn);
+        }
+        return this;
+      };
+
+      CssEmitter.prototype.unbind = function(fn) {
+        for (var i = 0; i < watch.length; i++) {
+          events.unbind(this.el, watch[i], fn);
+        }
+        return this;
+      };
+
+      CssEmitter.prototype.once = function(fn) {
+        var self = this;
+
+        function on() {
+          self.unbind(on);
+          fn.apply(self.el, arguments);
+        }
+        self.bind(on);
+        return this;
+      };
+    });
+
+    require.register("once", function(exports, module) {
+      var n = 0;
+      var global = (function() {
+        return this;
+      })();
+      module.exports = function(fn) {
+        var id = n++;
+
+        function once() {
+          // no receiver
+          if (this == global) {
+            if (once.called) return;
+            once.called = true;
+            return fn.apply(this, arguments);
+          }
+
+          // receiver
+          var key = '__called_' + id + '__';
+          if (this[key]) return;
+          this[key] = true;
+          return fn.apply(this, arguments);
+        }
+
+        return once;
+      };
+
+    });
+
+    require.register("yieldsAafterTransition", function(exports, module) {
+      var has = require('hasTransitions'),
+        emitter = require('cssEmitter'),
+        once = require('once');
+      var supported = has();
+      module.exports = after;
+
+      function after(el, fn) {
+        if (!supported || !has(el)) return fn();
+        emitter(el).bind(fn);
+        return fn;
+      }
+      after.once = function(el, fn) {
+        var callback = once(fn);
+        after(el, fn = function() {
+          emitter(el).unbind(fn);
+          callback();
+        });
+      };
+
+    });
+
+    require.register("emitter", function(exports, module) {
+      module.exports = Emitter;
+
+      function Emitter(obj) {
+        if (obj) return mixin(obj);
+      }
+
+      function mixin(obj) {
+        for (var key in Emitter.prototype) {
+          obj[key] = Emitter.prototype[key];
+        }
+        return obj;
+      }
+
+      Emitter.prototype.on =
+        Emitter.prototype.addEventListener = function(event, fn) {
+          this._callbacks = this._callbacks || {};
+          (this._callbacks['$' + event] = this._callbacks['$' + event] || [])
+          .push(fn);
+          return this;
+        };
+
+      Emitter.prototype.once = function(event, fn) {
+        function on() {
+          this.off(event, on);
+          fn.apply(this, arguments);
+        }
+
+        on.fn = fn;
+        this.on(event, on);
+        return this;
+      };
+
+      Emitter.prototype.off =
+        Emitter.prototype.removeListener =
+        Emitter.prototype.removeAllListeners =
+        Emitter.prototype.removeEventListener = function(event, fn) {
+          this._callbacks = this._callbacks || {};
+
+          // all:
+          if (0 === arguments.length) {
+            this._callbacks = {};
+            return this;
+          }
+
+          // specific event:
+          var callbacks = this._callbacks['$' + event];
+          if (!callbacks) return this;
+
+          // remove all handlers:
+          if (1 == arguments.length) {
+            delete this._callbacks['$' + event];
+            return this;
+          }
+
+          // remove specific handler:
+          var cb;
+          for (var i = 0; i < callbacks.length; i++) {
+            cb = callbacks[i];
+            if (cb === fn || cb.fn === fn) {
+              callbacks.splice(i, 1);
+              break;
+            }
+          }
+          return this;
+        };
+
+      Emitter.prototype.emit = function(event) {
+        this._callbacks = this._callbacks || {};
+        var args = [].slice.call(arguments, 1),
+          callbacks = this._callbacks['$' + event];
+
+        if (callbacks) {
+          callbacks = callbacks.slice(0);
+          for (var i = 0, len = callbacks.length; i < len; ++i) {
+            callbacks[i].apply(this, args);
+          }
+        }
+
+        return this;
+      };
+
+      Emitter.prototype.listeners = function(event) {
+        this._callbacks = this._callbacks || {};
+        return this._callbacks['$' + event] || [];
+      };
+
+      Emitter.prototype.hasListeners = function(event) {
+        return !!this.listeners(event).length;
+      };
+
+    });
+
+    require.register("cssEase", function(exports, module) {
+      module.exports = {
+        'in': 'ease-in',
+        'out': 'ease-out',
+        'in-out': 'ease-in-out',
+        'snap': 'cubic-bezier(0,1,.5,1)',
+        'linear': 'cubic-bezier(0.250, 0.250, 0.750, 0.750)',
+
+        'ease-in-quad': 'cubic-bezier(0.550, 0.085, 0.680, 0.530)',
+        'ease-out-quad': 'cubic-bezier(0.250, 0.460, 0.450, 0.940)',
+        'ease-in-out-quad': 'cubic-bezier(0.455, 0.030, 0.515, 0.955)',
+
+        'ease-in-cubic': 'cubic-bezier(0.550, 0.055, 0.675, 0.190)',
+        'ease-out-cubic': 'cubic-bezier(0.215, 0.610, 0.355, 1.000)',
+        'ease-in-out-cubic': 'cubic-bezier(0.645, 0.045, 0.355, 1.000)',
+
+        'ease-in-quart': 'cubic-bezier(0.895, 0.030, 0.685, 0.220)',
+        'ease-out-quart': 'cubic-bezier(0.165, 0.840, 0.440, 1.000)',
+        'ease-in-out-quart': 'cubic-bezier(0.770, 0.000, 0.175, 1.000)',
+
+        'ease-in-quint': 'cubic-bezier(0.755, 0.050, 0.855, 0.060)',
+        'ease-out-quint': 'cubic-bezier(0.230, 1.000, 0.320, 1.000)',
+        'ease-in-out-quint': 'cubic-bezier(0.860, 0.000, 0.070, 1.000)',
+
+        'ease-in-sine': 'cubic-bezier(0.470, 0.000, 0.745, 0.715)',
+        'ease-out-sine': 'cubic-bezier(0.390, 0.575, 0.565, 1.000)',
+        'ease-in-out-sine': 'cubic-bezier(0.445, 0.050, 0.550, 0.950)',
+
+        'ease-in-expo': 'cubic-bezier(0.950, 0.050, 0.795, 0.035)',
+        'ease-out-expo': 'cubic-bezier(0.190, 1.000, 0.220, 1.000)',
+        'ease-in-out-expo': 'cubic-bezier(1.000, 0.000, 0.000, 1.000)',
+        'ease-out-in-back': 'cubic-bezier(0,1,1,0)',
+
+        'ease-in-circ': 'cubic-bezier(0.600, 0.040, 0.980, 0.335)',
+        'ease-out-circ': 'cubic-bezier(0.075, 0.820, 0.165, 1.000)',
+        'ease-in-out-circ': 'cubic-bezier(0.785, 0.135, 0.150, 0.860)',
+        'ease-out-in-circ': 'cubic-bezier((0.135, 0.885, 0.860, 0.140)',
+
+        'ease-in-back': 'cubic-bezier(0.600, -0.280, 0.735, 0.045)',
+        'ease-out-back': 'cubic-bezier(0.175, 0.885, 0.320, 1.275)',
+        'ease-in-out-back': 'cubic-bezier(0.680, -0.550, 0.265, 1.550)'
+
+      };
+
+    });
+
+    require.register("anim", function(exports, module) {
+
+      var Emitter = require('emitter');
+
+      var query = function(selector) {
+        return document.querySelector(selector);
+      };
+
+      var after = require('yieldsAafterTransition');
+      var has3d = require('hasTranslate3d');
+      var ease = require('cssEase');
+      var translate = has3d ? ['translate3d(', ', 0)'] : ['translate(', ')'];
+      module.exports = Anim;
+      var style = window.getComputedStyle || window.currentStyle;
+
+      Anim.ease = ease;
+
+      Anim.defaults = {
+        duration: 500
+      };
+
+      // Default element selection used by anim(selector):
+      Anim.select = function(selector) {
+        return $(selector)[0];
+      };
+
+      // Initialize a new Anim with the given element:
+      function Anim(el) {
+        if (!(this instanceof Anim)) return new Anim(el);
+        if ('string' == typeof el) el = query(el);
+        if (!el) throw new TypeError('Anim must be initialized with element or selector');
+        this.el = el;
+        this._props = {};
+        this._rotate = 0;
+        this._transitionProps = [];
+        this._transforms = [];
+        this.duration(Anim.defaults.duration);
+        requestAnimationFrame(Anim)
+      }
+
+      // Inherit from EventEmitter.prototype:
+      Emitter(Anim.prototype);
+
+      // Buffer transform:
+      Anim.prototype.transform = function(transform) {
+        this._transforms.push(transform);
+        return this;
+      };
+
+      // Skew x and y:
+      Anim.prototype.skew = function(x, y) {
+        return this.transform('skew(' + x + 'deg, ' + (y || 0) + 'deg)');
+      };
+
+      // Skew x by n:
+      Anim.prototype.skewX = function(n) {
+        return this.transform('skewX(' + n + 'deg)');
+      };
+
+      // Skew y by n:
+      Anim.prototype.skewY = function(n) {
+        return this.transform('skewY(' + n + 'deg)');
+      };
+
+      // Translate x and y axis:
+      Anim.prototype.translate =
+        Anim.prototype.to = function(x, y) {
+          return this.transform(translate.join('' + x + 'px, ' + (y || 0) + 'px'));
+        };
+
+      // Translate on x axis:
+      Anim.prototype.translateX =
+        Anim.prototype.x = function(n) {
+          return this.transform('translateX(' + n + 'px)');
+        };
+
+      // Translate on y axis:
+      Anim.prototype.translateY =
+        Anim.prototype.y = function(n) {
+          return this.transform('translateY(' + n + 'px)');
+        };
+
+      // Scale x and y axis by x, or
+      // individually scale x and y:
+      Anim.prototype.scale = function(x, y) {
+        return this.transform('scale(' + x + ', ' + (y || x) + ')');
+      };
+
+      // Scale x axis by n
+      Anim.prototype.scaleX = function(n) {
+        return this.transform('scaleX(' + n + ')');
+      };
+
+      // Scale y axis by n
+      Anim.prototype.scaleY = function(n) {
+        return this.transform('scaleY(' + n + ')');
+      };
+
+      // Define matrix transform:
+      Anim.prototype.matrix = function(m11, m12, m21, m22, m31, m32) {
+        return this.transform('matrix(' + [m11, m12, m21, m22, m31, m32].join(',') + ')');
+      };
+
+      // Rotate n degrees:
+      Anim.prototype.rotate = function(n) {
+        return this.transform('rotate(' + n + 'deg)');
+      };
+
+      // Set transition easing function to fn string.
+      // Following shortcuts available:
+      // no argument - "ease" is used
+      // "in" - "ease-in" is used
+      // "out" - "ease-out" is used
+      // "in-out" - "ease-in-out" is used
+      Anim.prototype.ease = function(fn) {
+        fn = ease[fn] || fn || 'ease';
+        return this.setVendorProperty('transition-timing-function', fn);
+      };
+
+      // Set animation properties:
+      Anim.prototype.animate = function(name, props) {
+        for (var i in props) {
+          if (props.hasOwnProperty(i)) {
+            this.setVendorProperty('animation-' + i, props[i]);
+          }
+        }
+        return this.setVendorProperty('animation-name', name);
+      };
+
+      // Set duration to n milliseconds:
+      Anim.prototype.duration = function(n) {
+        n = this._duration = 'string' == typeof n ? parseFloat(n) * 1000 : n;
+        return this.setVendorProperty('transition-duration', n + 'ms');
+      };
+
+      // Delay the animation by n milliseconds:
+      Anim.prototype.delay = function(n) {
+        n = 'string' == typeof n ? parseFloat(n) * 1000 : n;
+        return this.setVendorProperty('transition-delay', n + 'ms');
+      };
+
+      // Set prop to val, deferred until .end() is invoked:
+      Anim.prototype.setProperty = function(prop, val) {
+        this._props[prop] = val;
+        return this;
+      };
+
+      // Set a vendor prefixed prop with the given val:
+      Anim.prototype.setVendorProperty = function(prop, val) {
+        this.setProperty('-webkit-' + prop, val);
+        this.setProperty('-moz-' + prop, val);
+        this.setProperty('-ms-' + prop, val);
+        return this;
+      };
+
+      // Set prop to value, deferred until .end() is invoked
+      // and adds the property to the list of transition props:
+      Anim.prototype.set = function(prop, val) {
+        this.transition(prop);
+        this._props[prop] = val;
+        return this;
+      };
+
+      // ncrement prop by val, deferred until .end() is invoked
+      // and adds the property to the list of transition props:
+      Anim.prototype.add = function(prop, val) {
+        if (!style) return;
+        var self = this;
+        return this.on('start', function() {
+          var curr = parseInt(self.current(prop), 10);
+          self.set(prop, curr + val + 'px');
+        });
+      };
+
+      // Decrement prop by val, deferred until .end() is invoked
+      // and adds the property to the list of transition props:
+      Anim.prototype.sub = function(prop, val) {
+        if (!style) return;
+        var self = this;
+        return this.on('start', function() {
+          var curr = parseInt(self.current(prop), 10);
+          self.set(prop, curr - val + 'px');
+        });
+      };
+
+      // Get computed or "current" value of prop:
+      Anim.prototype.current = function(prop) {
+        return style(this.el).getPropertyValue(prop);
+      };
+
+      // Add prop to the list of internal transition properties:
+      Anim.prototype.transition = function(prop) {
+        if (!this._transitionProps.indexOf(prop)) return this;
+        this._transitionProps.push(prop);
+        return this;
+      };
+
+      // Commit style properties, aka apply them to 
+      // the elemenet's style:
+      Anim.prototype.applyProperties = function() {
+        for (var prop in this._props) {
+          this.el.style.setProperty(prop, this._props[prop], '');
+        }
+        return this;
+      };
+
+      // Re-select element via selector, replacing
+      // the current element:
+      Anim.prototype.anim =
+        Anim.prototype.select = function(selector) {
+          this.el = Anim.select(selector);
+          return this;
+        };
+
+      // Defer the given fn until the animation
+      // is complete:
+      Anim.prototype.then = function(fn) {
+
+        // Invoke .end():
+        if (fn instanceof Anim) {
+          this.on('end', function() {
+            fn.run();
+          });
+
+          // Callback
+        } else if ('function' == typeof fn) {
+          this.on('end', fn);
+
+          // Chain:
+        } else {
+          var clone = new Anim(this.el);
+          clone._transforms = this._transforms.slice(0);
+          this.then(clone);
+          clone.parent = this;
+          return clone;
+        }
+
+        return this;
+      };
+
+      // Return parent:
+      Anim.prototype.pop = function() {
+        return this.parent;
+      };
+
+      // Reset duration:
+      Anim.prototype.reset = function() {
+        this.el.style.webkitTransitionDuration =
+          this.el.style.mozTransitionDuration =
+          this.el.style.msTransitionDuration =
+          this.el.style.oTransitionDuration = '';
+        return this;
+      };
+
+      Anim.prototype.run = function(fn) {
+        var self = this;
+
+        // Emit "start" event:
+        this.emit('start');
+
+        // Transforms:
+        if (this._transforms.length) {
+          this.setVendorProperty('transform', this._transforms.join(' '));
+        }
+
+        // Transition properties:
+        this.setVendorProperty('transition-properties', this._transitionProps.join(', '));
+        this.applyProperties();
+
+        // Callback given:
+        if (fn) this.then(fn);
+
+        // Emit "end" when complete:
+        after.once(this.el, function() {
+          self.reset();
+          self.emit('end');
+        });
+
+        return this;
+      };
+
+    });
+
+    $.extend({
+      anim: require('anim')
+    })
+  });
+})(window);
+// Truck Engine - OOP Module:
+(function() {
+  "use strict";
+  $.extend({
+
+    // Mixin one object into another:
+    //===============================
+    mixin: function(sourceObj, targetObj) {
+      for (var key in sourceObj) {
+        // Do not replace property if it exists:
+        if (!(key in targetObj)) {
+          targetObj[key] = sourceObj[key];
+        }
+      }
+      return targetObj;
+    },
+
+    // Create a clone of an object.
+    // This preserves the protytpe chain 
+    // to the original:
+    //==================================
+    clone: function(obj) {
+      if (typeof Object.create != 'function') {
+        Object.create = (function() {
+          function Temp() {}
+          var hasOwn = Object.prototype.hasOwnProperty;
+
+          return function(O) {
+            if (typeof O != 'object') {
+              throw TypeError('Object prototype may only be an Object or null');
+            }
+            Temp.prototype = O;
+            var obj = new Temp();
+            Temp.prototype = null;
+            if (arguments.length > 1) {
+              var Properties = Object(arguments[1]);
+              for (var prop in Properties) {
+                if (hasOwn.call(Properties, prop)) {
+                  obj[prop] = Properties[prop];
+                }
+              }
+            }
+            return obj;
+          };
+        })();
+      }
+      return Object.create(obj);
+    },
+
+    // Define Modules with dependencies.
+    //==================================
+    Modules: (function Manager() {
+
+      // Hold defined modules here:
+      var modules = {};
+
+      // dependencies is an array of quoted names.
+      // implementatoin is a revealing module that returns a function.
+      function add(name, dependencies, implementation) {
+        if ($.type(dependencies) === 'function' && !implementation) {
+          implementation = dependencies;
+          dependencies = [];
+        }
+        var depLen = dependencies.length;
+        for (var i = 0; i < depLen; i++) {
+          dependencies[i] = modules[dependencies[i]];
+        }
+        modules[name] = implementation.apply(implementation, dependencies);
+      }
+
+      // Execute the named module:
+      function run(name) {
+        return modules[name];
+      }
+
+      // Delete a module:
+      function remove(module) {
+        delete(modules[module]);
+      }
+
+      // Expose Modules methods:
+      return {
+        add: add,
+        run: run,
+        remove: remove
+      };
+    })()
+  });
+})();
 
 /*
   Truck body parts. These modules are used by both Truck Engine and jQuery. They are a set of widgets for users to interact with.
 */
 
-// Truck Body - Navbar Auto Layout
+// Truck Body - Adjust Navbar for iOS
 (function() {
   $(function() {
     "use strict";
@@ -7401,43 +8242,94 @@
         var siblings = screen.find('h1').siblings();
         var whichSide;
         var oppositeSide;
+        var rtl = ($('html').attr('dir') === 'rtl');
         var amount = 0;
         var padding = 20;
         var oppositeAmount = 25;
         var h1 = screen.find('h1');
         var navWidth = screen.find('nav').width();
+        var hidden = false;
+        var visibleSibling;
 
         var calculateLongest = function(a, b) {
           var widthA = a[0].clientWidth;
           var widthB = b[0].clientWidth;
+          if (!widthA) {
+            widthA = 0;
+            whichSide = 'margin-right';
+            oppositeSide = 'margin-left';
+            if (rtl) {
+              whichSide = 'margin-left';
+              oppositeSide = 'margin-right';
+            }
+          }
+          if (!widthB) {
+            widthB = 0;
+            whichSide = 'margin-left';
+            oppositeSide = 'margin-right';
+            if (rtl) {
+              whichSide = 'margin-right';
+              oppositeSide = 'margin-left';
+            }
+          }
           if (widthB > widthA) {
             whichSide = 'margin-left';
             oppositeSide = 'margin-right';
+            if (rtl) {
+              whichSide = 'margin-right';
+              oppositeSide = 'margin-left';
+            }
             amount = (widthB - widthA);
           } else if (widthA > widthB) {
             whichSide = 'margin-right';
             oppositeSide = 'margin-left';
+            if (rtl) {
+              whichSide = 'margin-left';
+              oppositeSide = 'margin-right';
+            }
             amount = (widthA - widthB);
           } else {
             amount = 0;
           }
         };
 
-        // If one sibling:
-        if (siblings.length === 1) {
-          var sibling = h1.siblings().eq(0);
+        function handleOneSibling(sib) {
+          var sibling = sib || h1.siblings().eq(0);
           amount = sibling.width();
-          if (siblings.is(':first-child')) {
+          if (sibling.is(':first-child')) {
             whichSide = 'margin-right';
             oppositeSide = 'margin-left';
-          } else if (siblings.eq(0).is(':last-child')) {
+            if (rtl) {
+              whichSide = 'margin-left';
+              oppositeSide = 'margin-right';
+            }
+          } else if (sibling.is(':last-child')) {
             whichSide = 'margin-left';
             oppositeSide = 'margin-right';
+            if (rtl) {
+              whichSide = 'margin-right';
+              oppositeSide = 'margin-left';
+            }
           }
+        }
+        // If one sibling:
+        if (siblings.length === 1) {
+          handleOneSibling();
 
           // If two siblings:
         } else if (siblings.length === 2) {
-          calculateLongest(siblings.eq(0), siblings.eq(1));
+          siblings.forEach(function(item) {
+            if ($(item).css('display') === 'none') {
+              hidden = true;
+            } else {
+              visibleSibling = $(item);
+            }
+          });
+          if (hidden) {
+            handleOneSibling(visibleSibling);
+          } else {
+            calculateLongest(siblings.eq(0), siblings.eq(1));
+          }
 
           // H1 is alone:
         } else {
@@ -7569,16 +8461,16 @@
       GoBack: function() {
         var currentScreen = $.screens.getCurrent();
         $.TruckRoutes.pop();
-        var fullDesintation = $.TruckRoutes.eq(-1);
-        var destination = $.TruckRoutes.eq(-1).split(':')[0];
-        var destinationScreen = getScreen(destination);
+        var desintation = $.TruckRoutes.eq(-1);
+        var dest = $.TruckRoutes.eq(-1).split(':')[0];
+        var destinationScreen = getScreen(dest);
         if ($.TruckRoutes.size() === 0) {
-          destination = $.screens.eq(0);
-          $.TruckRoutes.push(destination[0].id);
+          dest = $.screens.eq(0);
+          $.TruckRoutes.push(dest[0].id);
         }
         if (currentScreen[0]) currentScreen[0].scrollTop = 0;
         if (destinationScreen[0]) destinationScreen[0].scrollTop = 0;
-        $.Router.dispatch(fullDesintation);
+        $.Router.dispatch(desintation);
         makeScreenNext(currentScreen);
         makeScreenCurrent(destinationScreen);
         if ($.TruckRoutes.size() === 1) return;
@@ -7593,15 +8485,15 @@
         var currentScreen = $.screens.getCurrent();
         var position = $.TruckRoutes.index(destination);
         var destinationScreen = getScreen(destination);
-        $('screen.previous').removeClass('previous').addClass('next');
-        makeScreenCurrent(destinationScreen);
         var temp;
         while ($.TruckRoutes.size() > position + 1) {
           temp = $.TruckRoutes.pop();
           temp = getScreen(temp);
           makeScreenNext(temp);
         }
-      },
+        makeScreenCurrent(destinationScreen);
+        $.Router.dispatch(destination);
+      }
     });
 
 
@@ -7626,8 +8518,9 @@
       if ($.isNavigating) return;
       if (!element.hazAttr('data-goto')[0]) return;
       if (element.closest('ul').is('.deletable')) return;
-      element.addClass('selected');
       var destination = element.attr('data-goto');
+      if (!destination) return;
+      element.addClass('selected');
       setTimeout(function() {
         element.removeClass('selected');
       }, 1000);
@@ -7862,7 +8755,7 @@
     //========================
     // Setup a slide out menu:
     //========================
-    SlideOut: function(options) {
+    SlideOut: function() {
       var slideOutButton = $('<button class="slide-out-button"></button>');
       var slideOut = '<slideout><section></section></slideout>';
       $('body').prepend(slideOut);
@@ -7881,13 +8774,11 @@
         $(this).toggleClass('focused');
         if (slideout.hasClass('open')) {
           slideout.removeClass('open');
-          console.log('gonna disable the damn back button!')
-          slideout.attr('aria-hidden', "false");
+          slideout.removeAttr('aria-hidden');
           $('button.back').removeClass('disabled').removeProp('disabled');
           $('button.backTo').removeClass('disabled').removeProp('disabled');
         } else {
           slideout.addClass('open')
-          console.log('gonna leave the back button alone.')
           slideout.attr('aria-hidden', true);
           $('button.back').addClass('disabled').prop('disabled', true);
           $('button.backTo').addClass('disabled').prop('disabled', true);
@@ -7903,6 +8794,9 @@
         // Toggle Slide Out button:
         slideOutBtn.toggleClass('focused');
 
+        $('button.back').removeClass('disabled').removeProp('disabled');
+        $('button.backTo').removeClass('disabled').removeProp('disabled');
+
         // This list item shows a single screen:
         menuItems.hazClass('selected').removeClass('selected');
         $.screens.hazClass('show').removeClass('show').attr('aria-hidden', true);
@@ -7912,8 +8806,6 @@
         $('screen.previous').addClass('next').removeClass('previous');
         // Get route to dispatch:
         $.Router.dispatch(screenToShow);
-
-
 
         // Close slide out:
         slideout.removeClass('open');
@@ -7944,7 +8836,6 @@
     }
   });
 })();
-// Tank Body - Editable List
 (function() {
   'use strict';
   $.extend({
@@ -7964,7 +8855,6 @@
           movable: false (no movables),
           model: myModel,
           modelProp: 'id',
-          autobox: true,
           view: myView
         }
       */
@@ -7978,7 +8868,6 @@
         movable: true,
         model: undefined,
         modelProp: 'id',
-        autobox: false,
         view: undefined
       };
 
@@ -8097,6 +8986,7 @@
                 $($this).text(settings.editLabel);
                 $(list).removeClass('showIndicators');
                 $(list).find('li').removeClass('selected');
+                $($this).siblings('.cancel').hide();
               });
               var movedItems = [];
               $(list).find('li').forEach(function(ctx, idx) {
@@ -8116,12 +9006,11 @@
                 __model.purge();
                 __model.concat(__newarray, true);
                 __newarray = [];
-                if (settings.autobox) {
-                  // console.log('gonna box this!')
-
-                }
               }
             }
+            setTimeout(function() {
+              $.AdjustNavbarLayout($(element).closest('screen'));
+            })
           });
 
           // Handle deletion indicators:
@@ -8273,6 +9162,7 @@
       var __passed = false;
       var __errors = [];
       var __result = [];
+      var customValidation;
 
       // Helper to validate form elements:
       //==================================
@@ -8313,6 +9203,7 @@
               var namePart = nameParts[j];
               var arrName;
               if (namePart.indexOf('[]') > -1 && j === nameParts.length - 1) {
+
                 arrName = namePart.substr(0, namePart.indexOf('['));
                 if (!currResult[arrName]) {
                   currResult[arrName] = [];
@@ -8434,6 +9325,36 @@
             if (__passed) {
               validateElement(item);
             }
+          case 'multiselectlist':
+            __passed = $(item.element).validateMultiSelectList();
+            var inputs;
+            if (__passed) {
+              inputs = $(item.element).find('input[type=checkbox]');
+              inputs.forEach(function(item) {
+                if (item.checked) {
+                  convertToObject(item.name, item.value);
+                }
+              });
+            }
+        }
+        if (item.type.match(/custom/)) {
+          customValidation = item.type.split('custom-')[1];
+          var cv = $.customValidators.filter(function(validator) {
+            return (validator.name) === customValidation;
+          });
+          if (cv) {
+            var result = $.validateWithRegex(item.element, cv[0].regex);
+            if (result) {
+              var el = $(item.element);
+              convertToObject(el[0].name, el[0].value);
+            } else {
+              __errors.push({
+                element: item.element,
+                type: item.type
+              });
+              if (item.callback) item.callback();
+            }
+          }
         }
       });
 
@@ -8565,17 +9486,13 @@
         ctx.setAttribute('role', 'checkbox');
         $(ctx).removeClass('selected').find('input').removeAttr('checked');
         $(ctx).prepend('<span class="multi-selection-indicator"><svg width="30px" height="30px" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="multi-select-icon" stroke="#979797"><g id="multi-select-circle-+-mulit-select-checkmark" transform="translate(2.000000, 2.000000)"><circle id="multi-select-circle" cx="13" cy="13" r="13"></circle><path d="M4.71521456,15.9877529 L13.0000002,20.7028494 L19.977049,5.70284941" id="mulit-select-checkmark"></path></g></g></g></svg></span>');
-
+        $(ctx).append('<input type="checkbox" name="' + name + '" value="' + value + '">');
         if (selections.length) {
           selections.forEach(function(sel) {
             if (sel === idx) {
               ctx.setAttribute('aria-checked', 'true');
               ctx.classList.add('selected');
-              if (!$(ctx).find('input')[0]) {
-                $(ctx).append('<input type="checkbox" checked="checked" name="' + name + '" value="' + value + '">');
-              } else {
-                $(ctx).find('input').prop('checked', true).attr('value', value);
-              }
+              $(ctx).find('input').prop('checked', true).attr('value', value);
               __selection.push({
                 index: sel,
                 value: value
@@ -8583,10 +9500,6 @@
             }
           });
 
-        } else {
-          if (!$(ctx).find('input')[0]) {
-            $(ctx).append('<input type="checkbox" name="' + name + '" value="' + value + '">');
-          }
         }
       });
 
@@ -8731,9 +9644,7 @@
 
       return {
         getValue: function() {
-          if (__checked) {
-            return __selection;
-          }
+          return __selection;
         }
       };
     }
@@ -8921,12 +9832,14 @@
         var segmented;
         var labels = (settings.labels) ? settings.labels : [];
         var selected = settings.selected;
+        var __selection;
 
         function createSegmentedButton() {
           var __segmented = ['<div class="segmented">'];
           labels.forEach(function(ctx, idx) {
             if (settings.selected === idx) {
               __segmented.push('<button role="radio" aria-checked="true" class="selected">');
+              __selection = idx;
             } else {
               __segmented.push('<button role="radio">');
             }
@@ -8947,9 +9860,16 @@
           $this.siblings('button').removeClass('selected');
           $this.siblings('button').removeAttr('aria-checked');
           $this.addClass('selected');
+          __selection = $this.index();
           $this.attr('aria-checked', true);
           callback.call(this, e);
         });
+
+        return {
+          getSelection: function() {
+            return __selection
+          }
+        }
       }
     });
   });

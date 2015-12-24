@@ -3,21 +3,10 @@ $(function() {
   // Default variables:
   //===================
   var chosenGenre;
-  var fragrances;
 
   // Define cart model:
   //===================
   var CartModel = $.Model([], 'cart-model');
-
-  // Fetch json data:
-  //=================
-  fetch('data/fragrances.json')
-    .then($.json)
-    .then(function(data) {
-      fragrances = data;
-      console.log(app.fragrances);
-    });
-
 
   // Define views:
   //==============
@@ -138,6 +127,13 @@ $(function() {
       });
     }
     $('#confirmationNum').text(confirmationNumber());
+  });
+
+  $('#backToCart').on('tap', function() {
+    CartModel.purge();
+    TotalItemsView.empty();
+    TotalCostView.empty();
+    CartView.empty();
   });
 
   // Define Routes:

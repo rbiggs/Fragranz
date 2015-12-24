@@ -13,6 +13,7 @@
     <link href="images/apple-touch-startup-image-1242x2148.png" media="(device-width: 414px)" rel="apple-touch-startup-image">
     <link rel="stylesheet" href="dist/styles/truck-ios.css">
     <link rel="stylesheet" href="css/style.css">
+    <script type='text/javascript' src='data/fragrances.js'></script>
     <script type='text/javascript' src='dist/truck.js'></script>
     <script type='text/javascript' src='js/app.js'></script>
     
@@ -33,11 +34,14 @@
         <script type="text/x-template">
           <li class='nav' data-goto='fragranceList:${ data }'>
             <h3>${ data }</h3>
+            <aside>
+              <disclosure></disclosure>
+            </aside>
           </li>
         </script>
       </ul>
       <div id='fragranz_small' class='horizontal centered'>
-        <img src='images/fragranz_small.png'>
+        <img src='images/fragranz-bottle.png'>
       </div>
     </section>
   </screen> 
