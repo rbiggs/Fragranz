@@ -8,59 +8,64 @@ $(function() {
   //===================
   var CartModel = $.Model([], 'cart-model');
 
-  // Define views:
-  //==============
-  var GenreView = $.View({
-    element: '#fragranceGenres'
-  });
-  GenreView.render(['ladies','men','kids']);
 
-  var AvailableFragrancesView = $.View({
-    element: '#availableFragrances',
-    variable: 'fragrance'
-  });
+  // Define App namespace:
+  //======================
+  var App = {
 
-  var FragrancesGenreTitleView = $.View({
-    element: '#fragrancesGenreTitle',
-    variable: 'title'
-  });
+    GenreView: $.View({
+      element: '#fragranceGenres'
+    }),
 
-  var FragranceDetailView = $.View({
-    element: '#fragranceDetail',
-    variable: 'chosenFragrance'
-  });
+    AvailableFragrancesView: $.View({
+      element: '#availableFragrances',
+      variable: 'fragrance'
+    }),
 
-  var DetalTitleView = $.View({
-    element: '#detailTitle',
-    variable: 'title'
-  });
+    FragrancesGenreTitleView: $.View({
+      element: '#fragrancesGenreTitle',
+      variable: 'title'
+    }),
 
-  CartView = $.View({
-    element: '#purchaseItems',
-    model: CartModel,
-    variable: 'item'
-  });
+    FragranceDetailView: $.View({
+      element: '#fragranceDetail',
+      variable: 'chosenFragrance'
+    }),
 
-  var TotalItemsView = $.View({
-    element: '#totalItems',
-    variable: 'total'
-  });
+    DetalTitleView : $.View({
+      element: '#detailTitle',
+      variable: 'title'
+    }),
 
-  var TotalCostView = $.View({
-    element: '#totalCost',
-    variable: 'total'
-  });
+    CartView: $.View({
+      element: '#purchaseItems',
+      model: CartModel,
+      variable: 'item'
+    }),
 
-  var TotalPurchasedItemsViews = $.View({
-    element: '#purchaseDetails',
-    variable: 'item',
-    model: CartModel
-  });
+    TotalItemsView: $.View({
+      element: '#totalItems',
+      variable: 'total'
+    }),
 
-  var TotalPurchaseCostView = $.View({
-    element: '#confirmTotalCost',
-    variable: 'cost'
-  });
+    TotalCostView: $.View({
+      element: '#totalCost',
+      variable: 'total'
+    }),
+
+    TotalPurchasedItemsViews: $.View({
+      element: '#purchaseDetails',
+      variable: 'item',
+      model: CartModel
+    }),
+
+    TotalPurchaseCostView: $.View({
+      element: '#confirmTotalCost',
+      variable: 'cost'
+    })
+  };
+
+  App.GenreView.render(['ladies','men','kids']);
 
   // Add to cart:
   //=============
@@ -69,16 +74,16 @@ $(function() {
     CartModel.push(fragrance);
     $.GoToScreen('cart');
     CartModel.sortBy('genre', 'product_title')
-    CartView.render();
+    App.CartView.render();
     var prices = CartModel.pluck('wholesale_price');
     var sum = 0;
     prices.forEach(function(price) {
       sum += parseFloat(price);
     });
-    TotalItemsView.render([CartModel.size()]);
-    TotalCostView.render([$.currency(sum)]);
+    App.TotalItemsView.render([CartModel.size()]);
+    App.TotalCostView.render([$.currency(sum)]);
 
-    TotalPurchaseCostView.render([$.currency(sum)]);
+    App.TotalPurchaseCostView.render([$.currency(sum)]);
     $('#backToFragrance').find('span').text(fragrance.product_title);
   });
 
@@ -105,9 +110,9 @@ $(function() {
   //=================
   $('#cancelOrder').on('tap', function() {
     CartModel.purge();
-    TotalItemsView.empty();
-    TotalCostView.empty();
-    CartView.empty();
+    App.TotalItemsView.empty();
+    App.TotalCostView.empty();
+    App.CartView.empty();
     $.GoBackToScreen('main');
   });
 
@@ -115,7 +120,7 @@ $(function() {
   //==============
   $('#placeOrder').on('tap', function() {
     $.GoToScreen('confirmation');
-    TotalPurchasedItemsViews.render();
+    App.TotalPurchasedItemsViews.render();
     function confirmationNumber() {
       var d = Date.now();
       var charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
@@ -131,9 +136,9 @@ $(function() {
 
   $('#backToCart').on('tap', function() {
     CartModel.purge();
-    TotalItemsView.empty();
-    TotalCostView.empty();
-    CartView.empty();
+    App.TotalItemsView.empty();
+    App.TotalCostView.empty();
+    App.CartView.empty();
   });
 
   // Define Routes:
@@ -149,8 +154,8 @@ $(function() {
             chosenGenre.push(fragrance)
           }
         });
-        AvailableFragrancesView.render(chosenGenre);
-        FragrancesGenreTitleView.render([genre]);
+        App.AvailableFragrancesView.render(chosenGenre);
+        App.FragrancesGenreTitleView.render([genre]);
         $('#backToGenre span').text(genre);
       }
     },
@@ -160,8 +165,8 @@ $(function() {
         var chosenFragrance = chosenGenre.filter(function(fragrance) {
           return fragrance.sku === sku;
         });
-        FragranceDetailView.render(chosenFragrance);
-        DetalTitleView.render([chosenFragrance[0].product_title])
+        App.FragranceDetailView.render(chosenFragrance);
+        App.DetalTitleView.render([chosenFragrance[0].product_title])
         $('#addToCart').data('fragrance', chosenFragrance[0]);
       }
     }

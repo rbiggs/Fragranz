@@ -452,27 +452,18 @@
   }
   (function(Truck) {
     Truck.extend = function(targetObject, sourceObject) {
-      // enumerable = enumerable || false;
       if (!sourceObject) {
         sourceObject = targetObject;
         targetObject = Truck;
       }
-      for (var key in sourceObject) {
-        targetObject[key] = sourceObject[key];
+      var keys = Object.keys(sourceObject);
+      var len = keys.length;
+      while (len--) {
+        targetObject[keys[len]] = sourceObject[keys[len]];
       }
-      /*Object.keys(sourceObject).forEach(function(p) {
-        if (sourceObject.hasOwnProperty(p)) {
-          Object.defineProperty(targetObject, p, {
-            value: sourceObject[p],
-            writable: true,
-            enumerable: enumerable,
-            configurable: true
-          });
-        }
-      });*/
-
       return Truck;
     };
+
     Truck.fn = {
       extend: function(object) {
         return Truck.extend(DOMStack.prototype, object);
@@ -491,13 +482,10 @@
   // Define Utilities methods:
   //==========================
   if (typeof jQuery !== 'undefined') return;
-  var slice = function(elements) {
-    return [].slice.apply(elements);
-  };
   $.extend({
     lib: "TruckJS",
 
-    version: '0.0.1',
+    version: '1.0.0-beta.6',
 
     noop: function() {},
 
@@ -561,16 +549,44 @@
       return ret;
     },
 
-    require: function(src, callback) {
-      callback = callback || $.noop;
-      var script = document.createElement('script');
-      script.setAttribute('type', 'text/javascript');
-      script.setAttribute('src', src);
-      script.setAttribute('defer', 'defer');
-      script.onload = function() {
-        callback.apply(callback, arguments);
+    require: function(src, callback, ctx) {
+      var onerror = "onerror";
+      var insertScript = function(script) {
+        var firstScript = document.getElementsByTagName("script")[0];
+        firstScript.parentNode.insertBefore(script, firstScript);
       };
-      document.getElementsByTagName('head')[0].appendChild(script);
+      var script = document.createElement("script");
+      var done = false;
+      var err;
+      var loadScript;
+      var handleError = function() {
+        err = new Error(src || "EMPTY");
+        loadScript();
+      };
+      var setupLoad = function(fn) {
+        return function() {
+          // Only call once.
+          if (done) {
+            return;
+          }
+          done = true;
+          fn();
+          if (callback) {
+            callback.call(ctx, err);
+          }
+        };
+      };
+
+      loadScript = setupLoad(function() {
+        script.onload = script[onerror] = null;
+      });
+
+      script[onerror] = handleError;
+      script.onload = loadScript;
+      script.async = true;
+      script.charset = "utf-8";
+      script.src = src;
+      insertScript(script);
     },
 
     delay: function(func, milliseconds) {
@@ -1319,7 +1335,6 @@
     },
 
     replaceWith: function(content) {
-      var parent = this.parentNode;
       if (content && content.nodeType && content.nodeType === 1) {
         $(content).off();
       } else if (content.constructor.toString().match(/DOMStack/)) {
@@ -2454,130 +2469,6 @@
     });
   }
 })();
-// Truck Engine - Dispatcher Module:
-(function() {
-  "use strict";
-  var DispatchStack = function(array) {
-    var __array = [];
-    if (array && Array.isArray(array)) {
-      var i = -1;
-      var len = array.length;
-      while (++i < len) {
-        __array[i] = array[i];
-      }
-    } else if (array) {
-      var arr = Array.prototype.slice.apply(arguments);
-      arr.forEach(function(ctx, idx) {
-        __array[idx] = ctx;
-      });
-    }
-    return {
-
-      size: function() {
-        return __array.length;
-      },
-
-      push: function(data) {
-        __array.push(data);
-      },
-
-      pop: function() {
-        return __array.pop();
-      },
-
-      eq: function(index) {
-        if (index < 0) {
-          return __array[__array.length + index];
-        } else {
-          return __array[index];
-        }
-      },
-
-      forEach: function(callback) {
-        var value;
-        var i = -1;
-        var len = __array.length;
-        while (++i < len) {
-          value = callback.call(__array[i], __array[i], i);
-          if (value === false) {
-            break;
-          }
-        }
-      },
-
-      shift: function() {
-        return __array.shift.apply(__array, arguments);
-      },
-
-      unshift: function() {
-        return __array.unshift.apply(__array, arguments);
-      },
-
-      splice: function() {
-        return __array.splice.apply(__array, arguments);
-      },
-
-      indexOf: function() {
-        return __array.indexOf.apply(__array, arguments);
-      },
-
-      purge: function() {
-        __array = [];
-      },
-
-      getData: function() {
-        return __array;
-      }
-    };
-  };
-  $.extend({
-    handles: {},
-
-    // Handle: string defining handle: /some/handle
-    // Data: a string, number, array or object.
-    receive: function(handle, callback) {
-      if (!$.handles[handle]) {
-        $.handles[handle] = DispatchStack(); // jshint ignore:line
-      }
-      var token = ($.uuid());
-      $.handles[handle].push({
-        token: token,
-        callback: callback
-      });
-      return token;
-    },
-
-    dispatch: function(handle, args) {
-      if (!$.handles[handle]) {
-        return false;
-      }
-      setTimeout(function() {
-        var len = $.handles[handle] ? $.handles[handle].size() : 0;
-        while (len--) {
-          $.handles[handle].eq(len).callback(handle, args);
-        }
-        return true;
-      });
-      return true;
-    },
-
-    cancelReceiver: function(token) {
-      setTimeout(function() {
-        for (var m in $.handles) {
-          if ($.handles[m]) {
-            for (var i = 0, len = $.handles[m].size(); i < len; i++) {
-              if ($.handles[m].eq(i).token === token) {
-                $.handles[m].splice(i, 1);
-                return token;
-              }
-            }
-          }
-        }
-        return false;
-      });
-    }
-  });
-})();
 // Truck Engine - Stack Module:
 (function() {
   "use strict";
@@ -2762,6 +2653,205 @@
     }
   });
 })();
+// Truck Engine - Mediator Module:
+(function() {
+  "use strict";
+  $.extend({
+
+    MediatorStack: function(array) {
+      var __array = [];
+      if (array && Array.isArray(array)) {
+        var i = -1;
+        var len = array.length;
+        while (++i < len) {
+          __array[i] = array[i];
+        }
+      } else if (array) {
+        var arr = Array.prototype.slice.apply(arguments);
+        arr.forEach(function(ctx, idx) {
+          __array[idx] = ctx;
+        });
+      }
+      return {
+
+        size: function() {
+          return __array.length;
+        },
+
+        push: function(data) {
+          __array.push(data);
+        },
+
+        eq: function(index) {
+          if (index < 0) {
+            return __array[__array.length + index];
+          } else {
+            return __array[index];
+          }
+        },
+
+        indexOf: function() {
+          return __array.indexOf.apply(__array, arguments);
+        },
+
+        forEach: function(callback) {
+          var value;
+          var i = -1;
+          var len = __array.length;
+          while (++i < len) {
+            value = callback.call(__array[i], __array[i], i);
+            if (value === false) {
+              break;
+            }
+          }
+        },
+
+        setExecutable: function(token, exec) {
+          __array.forEach(function(receiver) {
+            if (receiver.token === token) {
+              receiver.exec = exec;
+              delete receiver.stopAfter;
+            }
+          });
+        },
+
+        setStopAfter: function(token, stopAfter) {
+          __array.forEach(function(receiver) {
+            if (receiver.token === token) {
+              receiver.stopAfter = stopAfter;
+            }
+          });
+        },
+
+        splice: function() {
+          return __array.splice.apply(__array, arguments);
+        },
+
+        getData: function() {
+          return __array;
+        }
+      };
+    },
+
+    // Object to hold all the receivers defined.
+    mediators: {},
+
+    // Handle: string defining handle: /some/handle
+    // Data: a string, number, array or object.
+    Mediator: function(handle, callback) {
+      if (!$.mediators[handle]) {
+        $.mediators[handle] = $.MediatorStack(); // jshint ignore:line
+      }
+      var __exec = true;
+      var __stopAfter;
+      var token = ($.uuid());
+      $.mediators[handle].push({
+        token: token,
+        callback: callback,
+        exec: true
+      });
+      return {
+        token: token,
+        handle: handle,
+        count: 0,
+        exec: __exec,
+
+        run: function(data) {
+          if (!this.exec) return;
+          if (__stopAfter && __stopAfter > 0) {
+            callback.call(this, data);
+            __stopAfter--;
+            if (!this.stopCount) this.count++;
+            $.mediators[handle].setStopAfter(token, __stopAfter);
+            if (__stopAfter === 0) {
+              this.exec = false;
+              $.mediators[handle].setExecutable(token, false);
+            }
+          } else {
+            if (callback) {
+              callback.call(this, data);
+              if (!this.stopCount) this.count++;
+            }
+          }
+        },
+
+        stop: function(stopAfter) {
+          if (stopAfter) {
+            __stopAfter = stopAfter;
+            $.mediators[handle].setStopAfter(token, stopAfter);
+          } else {
+            this.exec = false;
+            $.mediators[handle].setExecutable(token, false);
+          }
+        },
+
+        start: function() {
+          __exec = true;
+          $.mediators[handle].setExecutable(token, true);
+        }
+      };
+    },
+
+    receive: function(handle, callback) {
+      return $.Mediator(handle, callback);
+    },
+
+    dispatch: function(handle, args) {
+      if (!$.mediators[handle]) {
+        return false;
+      }
+      setTimeout(function() {
+        var len = $.mediators[handle] ? $.mediators[handle].size() : 0;
+        while (len--) {
+          if (!$.mediators[handle].eq(len).exec) return;
+          var stopAfter = $.mediators[handle].eq(len).stopAfter;
+          if (stopAfter > 0) {
+            $.mediators[handle].eq(len).callback(args);
+            stopAfter--;
+            $.mediators[handle].setStopAfter($.mediators[handle].eq(len).token, stopAfter);
+            if (stopAfter === 0) $.mediators[handle].eq(len).exec = false;
+          } else if (stopAfter === 0) {
+            return;
+          } else if (stopAfter === undefined) {
+            $.mediators[handle].eq(len).callback(args);
+          }
+        }
+        return true;
+      });
+      return true;
+    },
+
+    startDispatch: function(mediator) {
+      setTimeout(function() {
+        for (var m in $.mediators) {
+          if ($.mediators[m] && $.mediators[m].size()) {
+            $.mediators[m].forEach(function(item, i) {
+              if (item.token === mediator.token) {
+                item.exec = true;
+              }
+            });
+          }
+        }
+        return false;
+      });
+    },
+
+    stopDispatch: function(mediator) {
+      setTimeout(function() {
+        for (var m in $.mediators) {
+          if ($.mediators[m] && $.mediators[m].size()) {
+            $.mediators[m].forEach(function(item, i) {
+              if (item.token === mediator.token) {
+                item.exec = false;
+              }
+            });
+          }
+        }
+        return false;
+      });
+    }
+  });
+})();
 // Truck Engine - Model Module:
 (function() {
   "use strict";
@@ -2791,7 +2881,9 @@
       var propagateDataLoop = function(handle, data) {
         if ($.mediators[handle]) {
           $.mediators[handle].forEach(function(cntrl) {
-            cntrl.callback.call(cntrl.callback, data);
+            if (cntrl && cntrl.callback) {
+              cntrl.callback.call(cntrl.callback, data);
+            }
           });
         }
       };
@@ -3345,8 +3437,11 @@
           });
         },
 
-        setToAutobox: function() {
+        setToAutobox: function(options) {
           __autobox = true;
+          __name = options.name || $.Box.__config.name;
+          __boxName = options.boxName || 'keyvaluepairs';
+          __key = options.key || this.getHandle();
         },
 
         isBoxed: function() {
@@ -3365,254 +3460,12 @@
     }
   });
 })();
-// Truck-Engine - Mediators Module:
-(function() {
-  "use strict";
-  $.extend({
-    mediators: {},
-    //=================
-    // Define Mediator:
-    //=================
-    Mediator: function(handle) {
-      var __handle = handle;
-      var __token = $.uuid();
-      var __stopCount = false;
-      var __exec = true;
-      var __restartTime = 0;
-
-      // Return closure to encapsulate methods:
-      return {
-        init: function(callback) {
-          if (!callback) return;
-          var subscribe = function(handle, cb) {
-            if (!$.mediators[handle]) {
-              $.mediators[handle] = $.Stack();
-            }
-            $.mediators[handle].push({
-              token: __token,
-              callback: cb,
-              exec: true,
-              count: 0,
-              startFrom: 0,
-              stopAfter: 0,
-              time: 0,
-            });
-          };
-          subscribe(__handle, callback);
-        },
-
-        run: function(args) {
-          if (!$.mediators[__handle]) {
-            return;
-          }
-          if (__exec === false && !__restartTime) {
-            return;
-          } else {
-            setTimeout(function() {
-              var len = $.mediators[__handle].size();
-              for (var k = 0; k < len; k++) {
-                var item = $.mediators[__handle].eq(k);
-                if (item.exec === false && !item.time) {
-                  break;
-                } else {
-                  // Handle stop after designated number of times:
-                  if (item.stopAfter > 0 && __exec && item.exec) {
-                    if (item.startFrom < item.stopAfter) {
-                      if (!__stopCount) item.count++;
-                      item.startFrom++;
-                      item.callback(args);
-                      if (item.startFrom >= item.stopAfter) {
-                        __exec = false;
-                        item.exec = false;
-                        item.startFrom = 0;
-                        item.stopAfter = 0;
-                      }
-                      break;
-                    } else if (item.startFrom >= item.stopAfter) {
-                      item.exec = false;
-                      __exec = false;
-                      item.startFrom = 0;
-                      item.stopAfter = 0;
-                      break;
-                    }
-
-                    // Handle start after desinated time:
-                  } else if (item.time && item.time > 0) {
-                    if (item.time <= Date.now()) {
-                      item.exec = true;
-                      __exec = true;
-                      item.callback(args);
-                      if (!__stopCount) item.count++;
-                      __restartTime = 0;
-                      item.time = 0;
-                    } else {
-                      break;
-                    }
-
-                    // Otherwise just run it:
-                  } else {
-                    if (item.exec && __exec) {
-                      if (!__stopCount) item.count++;
-                      item.callback(args);
-                    }
-                  }
-                }
-              }
-            });
-          }
-        },
-
-        stop: function(after) {
-          $.mediators[__handle].map(function(item) {
-            if (item.token === __token) {
-              if (!isNaN(after)) {
-                item.stopAfter = after;
-                item.startFrom = 0;
-                __exec = true;
-                item.exec = true;
-              } else {
-                item.exec = false;
-                __exec = false;
-              }
-            }
-          });
-        },
-
-        restart: function(time) {
-          __exec = true;
-          $.mediators[__handle].map(function(item) {
-            if (item.token === __token) {
-              if (!isNaN(time)) {
-                item.time = (Date.now() + (time * 1000));
-                __restartTime = item.time;
-                item.exec = false;
-                __exec = false;
-              } else {
-                item.exec = true;
-                __exec = true;
-              }
-            }
-          });
-        },
-
-        getCount: function() {
-          var temp;
-          $.mediators[__handle].map(function(item) {
-            if (item.token === __token) {
-              temp = item.count;
-            }
-          });
-          return temp;
-        },
-
-        resetCount: function() {
-          $.mediators[__handle].forEach(function(item) {
-            item.count = 0;
-          });
-        },
-
-        stopCount: function() {
-          __stopCount = true;
-        },
-
-        kill: function(token) {
-          __exec = false;
-          setTimeout(function() {
-            for (var m in $.mediators) {
-              if ($.mediators[m]) {
-                for (var i = 0, len = $.mediators[m].length; i < len; i++) {
-                  if ($.mediators[m].eq(i).token === token) {
-                    $.mediators[m].splice(i, 1);
-                    return token;
-                  }
-                }
-              }
-            }
-            return false;
-          });
-        },
-      };
-    }
-  });
-
-  //==================================
-  // Define dipatcher to run mediators
-  // using the provided handle:
-  //==================================
-  $.extend($.Mediator, {
-    dispatch: function(handle, data) {
-      var len = $.mediators[handle].size();
-      for (var k = 0; k < len; k++) {
-        var item = $.mediators[handle].eq(k);
-        if (item.exec === false && !item.time) {
-          continue;
-        } else {
-          // Handle stop after designated number of times:
-          if (item.stopAfter > 0 && item.exec) {
-            if (item.startFrom < item.stopAfter) {
-              item.count++;
-              item.startFrom++;
-              item.callback(data);
-              if (item.startFrom >= item.stopAfter) {
-                item.exec = false;
-                item.startFrom = 0;
-                item.stopAfter = 0;
-              }
-              break;
-            } else if (item.startFrom >= item.stopAfter) {
-              item.exec = false;
-              item.startFrom = 0;
-              item.stopAfter = 0;
-              break;
-            }
-
-            // Handle start after desinated time:
-          } else if (item.time && item.time > 0) {
-            if (item.time <= Date.now()) {
-              item.exec = true;
-            } else {
-              break;
-            }
-
-            // Otherwise just run it:
-          } else {
-            if (item.exec) {
-              item.count++;
-              item.callback(data);
-            }
-          }
-        }
-      }
-    }
-  });
-})();
 // Truck Engine - View Module:
 (function() {
   "use strict";
   //=============
   // Define View:
   //=============
-  $.extend({
-    RegisteredViews: $.Stack([]),
-  });
-  $.extend($.RegisteredViews, {
-    getViewsByScreen: function(screen) {
-      var ret = [];
-      $.RegisteredViews.forEach(function(item) {
-        if (item.screen === screen) {
-          ret = item.views;
-        }
-      });
-      return ret;
-    },
-    getAllViews: function() {
-      var ret = [];
-      $.RegisteredViews.forEach(function(item) {
-        ret = ret.concat(item.views);
-      });
-      return ret;
-    }
-  });
 
   $.extend({
 
@@ -3651,9 +3504,9 @@
       }
       */
 
-      //////////////////////
+      //====================
       // Private Properties:
-      //////////////////////
+      //====================
       var __element;
       if (!options) options = {};
       if (options && options.element) {
@@ -3663,7 +3516,6 @@
       var __template = options.template;
       var __model = options.model;
       var __mediator = options.mediator;
-      var __name = options.name || $.uuid();
       var __index = options.index || 1;
       var __rendered = false;
       var __variable = options.variable || 'data';
@@ -3681,39 +3533,12 @@
       var __escapeHTML = options.escapeHTML || false;
       var __renderCount = 0;
 
-      var parentScreen = (function() {
-        if (__element && __element.closest('screen').size()) {
-          return __element.closest('screen')[0].id;
-        }
-      })();
-
-      var pluck = function(stack, property) {
-        var ret = [];
-        if (stack.size()) {
-          var len = stack.size();
-          var data = stack.getData();
-          for (var i = 0; i < len; i++) {
-            ret.push(data[i][property]);
-          }
-          return ret;
-        }
-      };
-      if (pluck($.RegisteredViews, parentScreen)) {
-        $.RegisteredViews.forEach(function(item) {
-          if (item.screen === parentScreen) {
-            item.views.push(__name);
-          }
-        });
-      } else {
-        $.RegisteredViews.push({
-          screen: parentScreen,
-          views: [__name]
-        });
-      }
-
-      ///////////////////
+      //===================
       // Private Functions:
-      ///////////////////
+      //===================
+
+      var parsedTemplate;
+
       var parseView = function(template, variable) {
         var interpolate = /\$\{([\s\S]+?)\}/img;
         variable = variable || 'data';
@@ -3746,10 +3571,6 @@
         }
       };
 
-      // Shell for parsing templates.
-      // It will hold the function returned by extractTemplate:
-      var parsedTemplate = function() {};
-
       // Get template from element:
       var extractTemplate = function() {
         if (!__element || !__element.size()) return;
@@ -3757,6 +3578,9 @@
         if (!__template) {
           if (__element.children()[0] && __element.children().eq(0).is('script')) {
             __template = __element.children('script').html();
+            __element.empty();
+          } else if (__element.children()[0] && __element.children().eq(0).is('template')) {
+            __template = __element.children('template').html();
             __element.empty();
           } else if (!__element[0].childNodes) {
             return;
@@ -3864,7 +3688,7 @@
           // Biding View to Model if Model provided
           var bindModelToView = function(handle) {
             if (!handle || typeof handle !== 'string') return;
-            if (!$.mediators[handle]) $.mediators[handle] = $.Stack();
+            if (!$.mediators[handle]) $.mediators[handle] = $.MediatorStack();
             $.mediators[handle].push({
               token: $.uuid(),
               callback: function() {
@@ -3880,7 +3704,7 @@
           };
 
           // Check extracted template:
-          if (!parsedTemplate && __template & $.type(__template) === 'string') {
+          if (!parsedTemplate && __template && $.type(__template) === 'string') {
             parsedTemplate = parseView(__template, __variable);
           }
 
@@ -4054,7 +3878,6 @@
         },
 
         unbind: function() {
-          var whichModel = __model;
           __model = undefined;
         },
 
@@ -4090,22 +3913,6 @@
           $(element).empty();
           handleEvents();
         },
-
-        // Old methods:
-        getParent: function() {
-          return __element;
-        },
-
-        setParent: function(element) {
-          if (!element) return;
-          __element = $(element);
-          $(element).empty();
-          handleEvents();
-        },
-
-        // Aliases for old names:
-        setParent: this.setElement,
-        getParent: this.getParent,
 
         stop: function(after) {
           // Stop after x number of times:
@@ -4187,10 +3994,6 @@
           return __lastRenderTime;
         },
 
-        getViewName: function() {
-          return __name;
-        },
-
         escapeHTML: function(boolean) {
           if (boolean) {
             __escapeHTML = true;
@@ -4258,22 +4061,19 @@
 
       Router: function() {
 
-        var TruckRouteCntrl = $.Mediator('Truck-Routes');
+        $.receive('Truck-Routes', $.noop);
 
         return {
           addRoute: function(options) {
             if ($.type(options) === 'array') {
               options.forEach(function(item) {
                 if (!$.mediators[item.route]) {
-                  $.mediators[item.route] = $.Stack();
+                  $.mediators[item.route] = $.MediatorStack();
                   $.mediators[item.route].push({
                     token: $.uuid(),
                     callback: item.callback,
                     exec: true,
-                    count: 0,
-                    start: 0,
-                    after: 0,
-                    time: 0
+                    count: 0
                   });
                 }
               });
@@ -5556,390 +5356,13 @@
   });
 })();
 // Truck Engine - Box, Data Persistence Module:
-(function loadModules(root, factory) {
+(function() {
   "use strict";
   $.extend({
-    Box: factory()
-  });
-})(this, function() {
-  return (function(modules) {
-    var installedModules = {};
-
-    function get_module(moduleId) {
-      if (installedModules[moduleId]) {
-        return installedModules[moduleId].exports;
-      }
-      var module = installedModules[moduleId] = {
-        exports: {},
-        id: moduleId
-      };
-      modules[moduleId].call(module.exports, module, module.exports, get_module);
-      return module.exports;
-    }
-
-    return get_module(0);
-  })
-
-  ([
-    // 0 - Truck Box Module:
-    //======================
-    function(module, exports, get_module) {
-      function __classCallCheck(instance, Constructor) {
-        if (!(instance instanceof Constructor)) {
-          throw new TypeError('Cannot call a class as a function');
-        }
-      }
-
-      (function() {
-        var CustomDrivers = {};
-        var DriverType = {
-          INDEXEDDB: 'asyncStorage',
-          LOCALSTORAGE: 'localStorageWrapper',
-          WEBSQL: 'webSQLStorage'
-        };
-        var DefaultDriverOrder = [DriverType.INDEXEDDB, DriverType.WEBSQL, DriverType.LOCALSTORAGE];
-        var LibraryMethods = ['clear', 'get', 'each', 'key', 'keys', 'size', 'remove', 'set'];
-
-        var DefaultConfig = {
-          description: '',
-          driver: DefaultDriverOrder.slice(),
-          name: 'truckbox',
-          size: 4980736,
-          boxName: 'keyvaluepairs',
-          version: 1.0
-        };
-
-        var driverSupport = (function(self) {
-          var indexedDB = indexedDB || self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.OIndexedDB || self.msIndexedDB;
-          var result = {};
-          result[DriverType.WEBSQL] = !!self.openDatabase;
-          result[DriverType.INDEXEDDB] = !!(function() {
-            if (typeof self.openDatabase !== 'undefined' && self.navigator && self.navigator.userAgent && /Safari/.test(self.navigator.userAgent) && !/Chrome/.test(self.navigator.userAgent)) {
-              return false;
-            }
-            try {
-              return indexedDB && typeof indexedDB.open === 'function' &&
-                typeof self.IDBKeyRange !== 'undefined';
-            } catch (e) {
-              return false;
-            }
-          })();
-
-          result[DriverType.LOCALSTORAGE] = !!(function() {
-            try {
-              return self.localStorage && 'set' in self.localStorage && self.localStorage.set;
-            } catch (e) {
-              return false;
-            }
-          })();
-
-          return result;
-        })(this);
-
-        var isArray = Array.isArray || function(arg) {
-          return Object.prototype.toString.call(arg) === '[object Array]';
-        };
-
-        function callWhenReady(truckBoxInstance, libraryMethod) {
-          truckBoxInstance[libraryMethod] = function() {
-            var __args = arguments;
-            return truckBoxInstance.ready().then(function() {
-              return truckBoxInstance[libraryMethod].apply(truckBoxInstance, __args);
-            });
-          };
-        }
-
-        function extend() {
-          for (var i = 1; i < arguments.length; i++) {
-            var arg = arguments[i];
-
-            if (arg) {
-              for (var key in arg) {
-                if (arg.hasOwnProperty(key)) {
-                  if (isArray(arg[key])) {
-                    arguments[0][key] = arg[key].slice();
-                  } else {
-                    arguments[0][key] = arg[key];
-                  }
-                }
-              }
-            }
-          }
-
-          return arguments[0];
-        }
-
-        function isLibraryDriver(driverName) {
-          for (var driver in DriverType) {
-            if (DriverType.hasOwnProperty(driver) && DriverType[driver] === driverName) {
-              return true;
-            }
-          }
-
-          return false;
-        }
-
-        var TruckBox = (function() {
-          function TruckBox(options) {
-            __classCallCheck(this, TruckBox);
-
-            this.INDEXEDDB = DriverType.INDEXEDDB;
-            this.LOCALSTORAGE = DriverType.LOCALSTORAGE;
-            this.WEBSQL = DriverType.WEBSQL;
-
-            this.__defaultConfig = extend({}, DefaultConfig);
-            this.__config = extend({}, this.__defaultConfig, options);
-            this.__driverSet = null;
-            this.__initDriver = null;
-            this.__ready = false;
-            this.__dbInfo = null;
-
-            this.__wrapLibraryMethodsWithReady();
-            this.setDriver(this.__config.driver);
-          }
-
-          TruckBox.prototype.config = function(options) {
-            if (typeof options === 'object') {
-              if (this.__ready) {
-                return new Error("Can't call config() after truckbox " + 'has been used.');
-              }
-              for (var i in options) {
-                if (i === 'boxName') {
-                  options[i] = options[i].replace(/\W/g, '_');
-                }
-
-                this.__config[i] = options[i];
-              }
-              if ('driver' in options && options.driver) {
-                this.setDriver(this.__config.driver);
-              }
-
-              return true;
-            } else if (typeof options === 'string') {
-              return this.__config[options];
-            } else {
-              return this.__config;
-            }
-          };
-
-          TruckBox.prototype.defineDriver = function(driverObject, callback, errorCallback) {
-            var promise = new Promise(function(resolve, reject) {
-              try {
-                var driverName = driverObject.__driver;
-                var complianceError = new Error('Custom driver not compliant; see Truck Box documentation');
-                var namingError = new Error('Custom driver name already in use: ' + driverObject.__driver);
-                if (!driverObject.__driver) {
-                  reject(complianceError);
-                  return;
-                }
-                if (isLibraryDriver(driverObject.__driver)) {
-                  reject(namingError);
-                  return;
-                }
-
-                var customDriverMethods = LibraryMethods.concat('__initStorage');
-                for (var i = 0; i < customDriverMethods.length; i++) {
-                  var customDriverMethod = customDriverMethods[i];
-                  if (!customDriverMethod || !driverObject[customDriverMethod] || typeof driverObject[customDriverMethod] !== 'function') {
-                    reject(complianceError);
-                    return;
-                  }
-                }
-
-                var supportPromise = Promise.resolve(true);
-                if ('__support' in driverObject) {
-                  if (driverObject.__support && typeof driverObject.__support === 'function') {
-                    supportPromise = driverObject.__support();
-                  } else {
-                    supportPromise = Promise.resolve(!!driverObject.__support);
-                  }
-                }
-
-                supportPromise.then(function(supportResult) {
-                  driverSupport[driverName] = supportResult;
-                  CustomDrivers[driverName] = driverObject;
-                  resolve();
-                }, reject);
-              } catch (e) {
-                reject(e);
-              }
-            });
-
-            promise.then(callback, errorCallback);
-            return promise;
-          };
-
-          TruckBox.prototype.driver = function() {
-            return this.__driver || null;
-          };
-
-          TruckBox.prototype.getDriver = function(driverName, callback, errorCallback) {
-            var self = this;
-            var getDriverPromise = (function() {
-              if (isLibraryDriver(driverName)) {
-                switch (driverName) {
-                  case self.INDEXEDDB:
-                    return new Promise(function(resolve, reject) {
-                      resolve(get_module(1));
-                    });
-                  case self.LOCALSTORAGE:
-                    return new Promise(function(resolve, reject) {
-                      resolve(get_module(3));
-                    });
-                  case self.WEBSQL:
-                    return new Promise(function(resolve, reject) {
-                      resolve(get_module(2));
-                    });
-                }
-              } else if (CustomDrivers[driverName]) {
-                return Promise.resolve(CustomDrivers[driverName]);
-              }
-
-              return Promise.reject(new Error('Driver not found.'));
-            })();
-
-            getDriverPromise.then(callback, errorCallback);
-            return getDriverPromise;
-          };
-
-          TruckBox.prototype.getSerializer = function(callback) {
-            var serializerPromise = new Promise(function(resolve, reject) {
-              resolve(get_module(4));
-            });
-            if (callback && typeof callback === 'function') {
-              serializerPromise.then(function(result) {
-                callback(result);
-              });
-            }
-            return serializerPromise;
-          };
-
-          TruckBox.prototype.ready = function(callback) {
-            var self = this;
-
-            var promise = self.__driverSet.then(function() {
-              if (self.__ready === null) {
-                self.__ready = self.__initDriver();
-              }
-
-              return self.__ready;
-            });
-
-            promise.then(callback, callback);
-            return promise;
-          };
-
-          TruckBox.prototype.setDriver = function(drivers, callback, errorCallback) {
-            var self = this;
-
-            if (!isArray(drivers)) {
-              drivers = [drivers];
-            }
-
-            var supportedDrivers = this.__getSupportedDrivers(drivers);
-
-            function setDriverToConfig() {
-              self.__config.driver = self.driver();
-            }
-
-            function initDriver(supportedDrivers) {
-              return function() {
-                var currentDriverIndex = 0;
-
-                function driverPromiseLoop() {
-                  while (currentDriverIndex < supportedDrivers.length) {
-                    var driverName = supportedDrivers[currentDriverIndex];
-                    currentDriverIndex++;
-
-                    self.__dbInfo = null;
-                    self.__ready = null;
-
-                    return self.getDriver(driverName).then(function(driver) {
-                      self.__extend(driver);
-                      setDriverToConfig();
-
-                      self.__ready = self.__initStorage(self.__config);
-                      return self.__ready;
-                    })['catch'](driverPromiseLoop);
-                  }
-
-                  setDriverToConfig();
-                  var error = new Error('No available storage method found.');
-                  self.__driverSet = Promise.reject(error);
-                  return self.__driverSet;
-                }
-
-                return driverPromiseLoop();
-              };
-            }
-
-            var oldDriverSetDone = this.__driverSet !== null ? this.__driverSet['catch'](function() {
-              return Promise.resolve();
-            }) : Promise.resolve();
-
-            this.__driverSet = oldDriverSetDone.then(function() {
-              var driverName = supportedDrivers[0];
-              self.__dbInfo = null;
-              self.__ready = null;
-
-              return self.getDriver(driverName).then(function(driver) {
-                self.__driver = driver.__driver;
-                setDriverToConfig();
-                self.__wrapLibraryMethodsWithReady();
-                self.__initDriver = initDriver(supportedDrivers);
-              });
-            })['catch'](function() {
-              setDriverToConfig();
-              var error = new Error('No available storage method found.');
-              self.__driverSet = Promise.reject(error);
-              return self.__driverSet;
-            });
-
-            this.__driverSet.then(callback, errorCallback);
-            return this.__driverSet;
-          };
-
-          TruckBox.prototype.supports = function(driverName) {
-            return !!driverSupport[driverName];
-          };
-
-          TruckBox.prototype.__extend = function(libraryMethodsAndProperties) {
-            extend(this, libraryMethodsAndProperties);
-          };
-
-          TruckBox.prototype.__getSupportedDrivers = function(drivers) {
-            var supportedDrivers = [];
-            for (var i = 0, len = drivers.length; i < len; i++) {
-              var driverName = drivers[i];
-              if (this.supports(driverName)) {
-                supportedDrivers.push(driverName);
-              }
-            }
-            return supportedDrivers;
-          };
-
-          TruckBox.prototype.__wrapLibraryMethodsWithReady = function() {
-            for (var i = 0; i < LibraryMethods.length; i++) {
-              callWhenReady(this, LibraryMethods[i]);
-            }
-          };
-
-          TruckBox.prototype.createInstance = function(options) {
-            return new TruckBox(options);
-          };
-
-          return TruckBox;
-        })();
-
-        var truckBox = new TruckBox();
-
-        exports['default'] = truckBox;
-      }).call(typeof window !== 'undefined' ? window : self);
-      module.exports = exports['default'];
-    },
-    // 1 - Driver for IndexedDB:
-    //==========================
-    function(module, exports) {
+    Box: (function() {
+      //==================
+      // IndexedDB Driver:
+      //==================
       (function() {
         var globalObject = this;
         var indexedDB = indexedDB || this.indexedDB || this.webkitIndexedDB || this.mozIndexedDB || this.OIndexedDB || this.msIndexedDB;
@@ -5947,7 +5370,7 @@
           return;
         }
 
-        var DETECT_BLOB__support_STORE = 'local-forage-detect-blob-support';
+        var DETECT_BLOB__support_STORE = 'truck-box-detect-blob-support';
         var supportsBlobs;
         var dbContexts;
 
@@ -6052,7 +5475,7 @@
             reader.onloadend = function(e) {
               var base64 = btoa(e.target.result || '');
               resolve({
-                __local_forage_encoded_blob: true,
+                __truck_box_encoded_blob: true,
                 data: base64,
                 type: blob.type
               });
@@ -6069,7 +5492,7 @@
         }
 
         function __isEncodedBlob(value) {
-          return value && value.__local_forage_encoded_blob;
+          return value && value.__truck_box_encoded_blob;
         }
 
         function __initStorage(options) {
@@ -6107,9 +5530,9 @@
           }
 
           for (var j = 0; j < dbContext.box.length; j++) {
-            var forage = dbContext.box[j];
-            if (forage !== this) {
-              readyPromises.push(forage.ready()['catch'](ignoreErrors));
+            var truckbox = dbContext.box[j];
+            if (truckbox !== this) {
+              readyPromises.push(truckbox.ready()['catch'](ignoreErrors));
             }
           }
 
@@ -6127,10 +5550,10 @@
             dbInfo.db = dbContext.db = db;
             self.__dbInfo = dbInfo;
             for (var k in box) {
-              var forage = box[k];
-              if (forage !== self) {
-                forage.__dbInfo.db = dbInfo.db;
-                forage.__dbInfo.version = dbInfo.version;
+              var truckbox = box[k];
+              if (truckbox !== self) {
+                truckbox.__dbInfo.db = dbInfo.db;
+                truckbox.__dbInfo.version = dbInfo.version;
               }
             }
           });
@@ -6515,16 +5938,15 @@
           keys: keys
         };
 
-        exports['default'] = asyncStorage;
-      }).call(typeof window !== 'undefined' ? window : self);
-      module.exports = exports['default'];
-    },
-    // 2 - Driver for WebSQL:
-    //=======================
-    function(module, exports, get_module) {
-      exports.__esModule = true;
-      (function() {
+        // Export driver:
+        this.asyncStorage = asyncStorage;
+        window.asyncStorage = asyncStorage;
+      }).call(window);
 
+      //===============
+      // WebSQL Driver:
+      //===============
+      (function() {
         var globalObject = this;
         var openDatabase = this.openDatabase;
         if (!openDatabase) {
@@ -6563,7 +5985,7 @@
           });
 
           return new Promise(function(resolve, reject) {
-            resolve(get_module(4));
+            resolve(truckBoxSerializer);
           }).then(function(lib) {
             dbInfo.serializer = lib;
             return dbInfoPromise;
@@ -6812,18 +6234,19 @@
           keys: keys
         };
 
-        exports['default'] = webSQLStorage;
-      }).call(typeof window !== 'undefined' ? window : self);
-      module.exports = exports['default'];
-    },
-    // 3 - Driver for localStorage:
-    //=============================
-    function(module, exports, get_module) {
+        // Export driver:
+        this.webSQLStorage = webSQLStorage;
+        window.webSQLStorage = webSQLStorage;
+      }).call(window);
+
+      //=====================
+      // localStorage Driver:
+      //=====================
       (function() {
         var globalObject = this;
         var localStorage = null;
         try {
-          if (!this.localStorage || !('set' in this.localStorage)) {
+          if (!this.localStorage || !('setItem' in this.localStorage)) {
             return;
           }
           localStorage = this.localStorage;
@@ -6849,7 +6272,7 @@
           self.__dbInfo = dbInfo;
 
           return new Promise(function(resolve, reject) {
-            resolve(get_module(4));
+            resolve(truckBoxSerializer);
           }).then(function(lib) {
             dbInfo.serializer = lib;
             return Promise.resolve();
@@ -6865,7 +6288,7 @@
               var key = localStorage.key(i);
 
               if (key.indexOf(keyPrefix) === 0) {
-                localStorage.remove(key);
+                localStorage.removeItem(key);
               }
             }
           });
@@ -6883,7 +6306,7 @@
 
           var promise = self.ready().then(function() {
             var dbInfo = self.__dbInfo;
-            var result = localStorage.get(dbInfo.keyPrefix + key);
+            var result = localStorage.getItem(dbInfo.keyPrefix + key);
             if (result) {
               result = dbInfo.serializer.deserialize(result);
             }
@@ -6910,7 +6333,7 @@
               if (key.indexOf(keyPrefix) !== 0) {
                 continue;
               }
-              var value = localStorage.get(key);
+              var value = localStorage.getItem(key);
               if (value) {
                 value = dbInfo.serializer.deserialize(value);
               }
@@ -6960,7 +6383,6 @@
                 keys.push(localStorage.key(i).substring(dbInfo.keyPrefix.length));
               }
             }
-
             return keys;
           });
 
@@ -6987,7 +6409,7 @@
 
           var promise = self.ready().then(function() {
             var dbInfo = self.__dbInfo;
-            localStorage.remove(dbInfo.keyPrefix + key);
+            localStorage.removeItem(dbInfo.keyPrefix + key);
           });
 
           executeCallback(promise, callback);
@@ -7014,7 +6436,7 @@
                   reject(error);
                 } else {
                   try {
-                    localStorage.set(dbInfo.keyPrefix + key, value);
+                    localStorage.setItem(dbInfo.keyPrefix + key, value);
                     resolve(originalValue);
                   } catch (e) {
                     if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
@@ -7054,20 +6476,19 @@
           keys: keys
         };
 
-        exports['default'] = localStorageWrapper;
-      }).call(typeof window !== 'undefined' ? window : self);
-      module.exports = exports['default'];
-    },
-    // 4 - Serializer:
-    //================
-    function(module, exports) {
+        // Export driver:
+        this.localStorageWrapper = localStorageWrapper;
+        window.localStorageWrapper = localStorageWrapper;
+      }).call(window);
 
-      exports.__esModule = true;
+      //=================
+      // Blob Serializer:
+      //=================
       (function() {
         var BASE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-        var BLOB_TYPE_PREFIX = '~~local_forage_type~';
-        var BLOB_TYPE_PREFIX_REGEX = /^~~local_forage_type~([^~]+)~/;
+        var BLOB_TYPE_PREFIX = '~~truck_box_type~';
+        var BLOB_TYPE_PREFIX_REGEX = /^~~truck_box_type~([^~]+)~/;
         var SERIALIZED_MARKER = '__lfsc__:';
         var SERIALIZED_MARKER_LENGTH = SERIALIZED_MARKER.length;
         var TYPE_ARRAYBUFFER = 'arbf';
@@ -7266,12 +6687,360 @@
           bufferToString: bufferToString
         };
 
-        exports['default'] = truckBoxSerializer;
-      }).call(typeof window !== 'undefined' ? window : self);
-      module.exports = exports['default'];
-    }
-  ]);
-});
+        // Export driver:
+        this.truckBoxSerializer = truckBoxSerializer;
+        window.truckBoxSerializer = truckBoxSerializer;
+      }).call(window);
+
+      //==========================
+      // Truck Box Implementation:
+      //==========================
+      var CustomDrivers = {};
+      var DriverType = {
+        INDEXEDDB: 'asyncStorage',
+        LOCALSTORAGE: 'localStorageWrapper',
+        WEBSQL: 'webSQLStorage'
+      };
+      var DefaultDriverOrder = [DriverType.INDEXEDDB, DriverType.WEBSQL, DriverType.LOCALSTORAGE];
+      var LibraryMethods = ['clear', 'get', 'each', 'key', 'keys', 'size', 'remove', 'set'];
+
+      var DefaultConfig = {
+        description: '',
+        driver: DefaultDriverOrder.slice(),
+        name: 'truckbox',
+        size: 4980736,
+        boxName: 'keyvaluepairs',
+        version: 1.0
+      };
+
+      var driverSupport = (function(self) {
+        var indexedDB = indexedDB || self.indexedDB || self.webkitIndexedDB || self.mozIndexedDB || self.OIndexedDB || self.msIndexedDB;
+        var result = {};
+        result[DriverType.WEBSQL] = !!self.openDatabase;
+        result[DriverType.INDEXEDDB] = !!(function() {
+          if (typeof self.openDatabase !== 'undefined' && self.navigator && self.navigator.userAgent && /Safari/.test(self.navigator.userAgent) && !/Chrome/.test(self.navigator.userAgent)) {
+            return false;
+          }
+          try {
+            return indexedDB && typeof indexedDB.open === 'function' &&
+              typeof self.IDBKeyRange !== 'undefined';
+          } catch (e) {
+            return false;
+          }
+        })();
+
+        result[DriverType.LOCALSTORAGE] = !!(function() {
+          try {
+            return self.localStorage && 'setItem' in self.localStorage && self.localStorage.setItem;
+          } catch (e) {
+            return false;
+          }
+        })();
+
+        return result;
+      })(window);
+
+      var isArray = Array.isArray || function(arg) {
+        return Object.prototype.toString.call(arg) === '[object Array]';
+      };
+
+      function callWhenReady(truckBoxInstance, libraryMethod) {
+        truckBoxInstance[libraryMethod] = function() {
+          var __args = arguments;
+          return truckBoxInstance.ready().then(function() {
+            return truckBoxInstance[libraryMethod].apply(truckBoxInstance, __args);
+          });
+        };
+      }
+
+      function extend() {
+        for (var i = 1; i < arguments.length; i++) {
+          var arg = arguments[i];
+
+          if (arg) {
+            for (var key in arg) {
+              if (arg.hasOwnProperty(key)) {
+                if (isArray(arg[key])) {
+                  arguments[0][key] = arg[key].slice();
+                } else {
+                  arguments[0][key] = arg[key];
+                }
+              }
+            }
+          }
+        }
+
+        return arguments[0];
+      }
+
+      function isLibraryDriver(driverName) {
+        for (var driver in DriverType) {
+          if (DriverType.hasOwnProperty(driver) && DriverType[driver] === driverName) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      var TruckBox = (function() {
+        function TruckBox(options) {
+
+          this.INDEXEDDB = DriverType.INDEXEDDB;
+          this.LOCALSTORAGE = DriverType.LOCALSTORAGE;
+          this.WEBSQL = DriverType.WEBSQL;
+
+          this.__defaultConfig = extend({}, DefaultConfig);
+          this.__config = extend({}, this.__defaultConfig, options);
+          this.__driverSet = null;
+          this.__initDriver = null;
+          this.__ready = false;
+          this.__dbInfo = null;
+
+          this.__wrapLibraryMethodsWithReady();
+          this.setDriver(this.__config.driver);
+        }
+
+        TruckBox.prototype.config = function(options) {
+          if (typeof options === 'object') {
+            if (this.__ready) {
+              return new Error("Can't call config() after truckbox " + 'has been used.');
+            }
+            for (var i in options) {
+              if (i === 'boxName') {
+                options[i] = options[i].replace(/\W/g, '_');
+              }
+
+              this.__config[i] = options[i];
+            }
+            if ('driver' in options && options.driver) {
+              this.setDriver(this.__config.driver);
+            }
+
+            return true;
+          } else if (typeof options === 'string') {
+            return this.__config[options];
+          } else {
+            return this.__config;
+          }
+        };
+
+        TruckBox.prototype.defineDriver = function(driverObject, callback, errorCallback) {
+          var promise = new Promise(function(resolve, reject) {
+            try {
+              var driverName = driverObject.__driver;
+              var complianceError = new Error('Custom driver not compliant; see Truck Box documentation');
+              var namingError = new Error('Custom driver name already in use: ' + driverObject.__driver);
+              if (!driverObject.__driver) {
+                reject(complianceError);
+                return;
+              }
+              if (isLibraryDriver(driverObject.__driver)) {
+                reject(namingError);
+                return;
+              }
+
+              var customDriverMethods = LibraryMethods.concat('__initStorage');
+              for (var i = 0; i < customDriverMethods.length; i++) {
+                var customDriverMethod = customDriverMethods[i];
+                if (!customDriverMethod || !driverObject[customDriverMethod] || typeof driverObject[customDriverMethod] !== 'function') {
+                  reject(complianceError);
+                  return;
+                }
+              }
+
+              var supportPromise = Promise.resolve(true);
+              if ('__support' in driverObject) {
+                if (driverObject.__support && typeof driverObject.__support === 'function') {
+                  supportPromise = driverObject.__support();
+                } else {
+                  supportPromise = Promise.resolve(!!driverObject.__support);
+                }
+              }
+
+              supportPromise.then(function(supportResult) {
+                driverSupport[driverName] = supportResult;
+                CustomDrivers[driverName] = driverObject;
+                resolve();
+              }, reject);
+            } catch (e) {
+              reject(e);
+            }
+          });
+
+          promise.then(callback, errorCallback);
+          return promise;
+        };
+
+        TruckBox.prototype.driver = function() {
+          return this.__driver || null;
+        };
+
+        TruckBox.prototype.getDriver = function(driverName, callback, errorCallback) {
+          var self = this;
+          var getDriverPromise = (function() {
+            if (isLibraryDriver(driverName)) {
+              switch (driverName) {
+                case self.INDEXEDDB:
+                  return new Promise(function(resolve, reject) {
+                    resolve(asyncStorage);
+                  });
+                case self.LOCALSTORAGE:
+                  return new Promise(function(resolve, reject) {
+                    resolve(localStorageWrapper);
+                  });
+                case self.WEBSQL:
+                  return new Promise(function(resolve, reject) {
+                    resolve(webSQLStorage);
+                  });
+              }
+            } else if (CustomDrivers[driverName]) {
+              console.log('Using: ' + driverName)
+              return Promise.resolve(CustomDrivers[driverName]);
+            }
+
+            return Promise.reject(new Error('Driver not found.'));
+          })();
+
+          getDriverPromise.then(callback, errorCallback);
+          return getDriverPromise;
+        };
+
+        TruckBox.prototype.getSerializer = function(callback) {
+          var serializerPromise = new Promise(function(resolve, reject) {
+            resolve(truckBoxSerializer)
+          });
+          if (callback && typeof callback === 'function') {
+            serializerPromise.then(function(result) {
+              callback(result);
+            });
+          }
+          return serializerPromise;
+        };
+
+        TruckBox.prototype.ready = function(callback) {
+          var self = this;
+
+          var promise = self.__driverSet.then(function() {
+            if (self.__ready === null) {
+              self.__ready = self.__initDriver();
+            }
+
+            return self.__ready;
+          });
+
+          promise.then(callback, callback);
+          return promise;
+        };
+
+        TruckBox.prototype.setDriver = function(drivers, callback, errorCallback) {
+          var self = this;
+
+          if (!isArray(drivers)) {
+            drivers = [drivers];
+          }
+
+          var supportedDrivers = this.__getSupportedDrivers(drivers);
+
+          function setDriverToConfig() {
+            self.__config.driver = self.driver();
+          }
+
+          function initDriver(supportedDrivers) {
+            return function() {
+              var currentDriverIndex = 0;
+
+              function driverPromiseLoop() {
+                while (currentDriverIndex < supportedDrivers.length) {
+                  var driverName = supportedDrivers[currentDriverIndex];
+                  currentDriverIndex++;
+
+                  self.__dbInfo = null;
+                  self.__ready = null;
+
+                  return self.getDriver(driverName).then(function(driver) {
+                    self.__extend(driver);
+                    setDriverToConfig();
+
+                    self.__ready = self.__initStorage(self.__config);
+                    return self.__ready;
+                  })['catch'](driverPromiseLoop);
+                }
+
+                setDriverToConfig();
+                var error = new Error('No available storage method found.');
+                self.__driverSet = Promise.reject(error);
+                return self.__driverSet;
+              }
+
+              return driverPromiseLoop();
+            };
+          }
+
+          var oldDriverSetDone = this.__driverSet !== null ? this.__driverSet['catch'](function() {
+            return Promise.resolve();
+          }) : Promise.resolve();
+
+          this.__driverSet = oldDriverSetDone.then(function() {
+            var driverName = supportedDrivers[0];
+            self.__dbInfo = null;
+            self.__ready = null;
+
+            return self.getDriver(driverName).then(function(driver) {
+              self.__driver = driver.__driver;
+              setDriverToConfig();
+              self.__wrapLibraryMethodsWithReady();
+              self.__initDriver = initDriver(supportedDrivers);
+            });
+          })['catch'](function() {
+            setDriverToConfig();
+            var error = new Error('No available storage method found.');
+            self.__driverSet = Promise.reject(error);
+            return self.__driverSet;
+          });
+
+          this.__driverSet.then(callback, errorCallback);
+          return this.__driverSet;
+        };
+
+        TruckBox.prototype.supports = function(driverName) {
+          return !!driverSupport[driverName];
+        };
+
+        TruckBox.prototype.__extend = function(libraryMethodsAndProperties) {
+          extend(this, libraryMethodsAndProperties);
+        };
+
+        TruckBox.prototype.__getSupportedDrivers = function(drivers) {
+          var supportedDrivers = [];
+          for (var i = 0, len = drivers.length; i < len; i++) {
+            var driverName = drivers[i];
+            if (this.supports(driverName)) {
+              supportedDrivers.push(driverName);
+            }
+          }
+          return supportedDrivers;
+        };
+
+        TruckBox.prototype.__wrapLibraryMethodsWithReady = function() {
+          for (var i = 0; i < LibraryMethods.length; i++) {
+            callWhenReady(this, LibraryMethods[i]);
+          }
+        };
+
+        TruckBox.prototype.createInstance = function(options) {
+          return new TruckBox(options);
+        };
+
+        return TruckBox;
+      })();
+
+      var truckBox = new TruckBox();
+      return truckBox;
+    })()
+  });
+})();
+
 // Truck Engine - Driver for sessionStorage:
 (function() {
   'use strict';
@@ -7281,7 +7050,7 @@
 
   function getSupport() {
     try {
-      if (globalObject.sessionStorage && ('set' in globalObject.sessionStorage)) {
+      if (globalObject.sessionStorage && ('setItem' in globalObject.sessionStorage)) {
         return true;
       }
     } catch (e) {}
@@ -7343,7 +7112,7 @@
 
     var promise = self.ready().then(function() {
       var dbInfo = self.__dbInfo;
-      var result = sessionStorage.get(dbInfo.keyPrefix + key);
+      var result = sessionStorage.getItem(dbInfo.keyPrefix + key);
       if (result) {
         result = serializer.deserialize(result);
       }
@@ -7362,7 +7131,7 @@
       var length = sessionStorage.length;
       for (var i = 0; i < length; i++) {
         var key = sessionStorage.key(i);
-        var value = sessionStorage.get(key);
+        var value = sessionStorage.getItem(key);
         if (value) {
           value = serializer.deserialize(value);
         }
@@ -7457,7 +7226,7 @@
           } else {
             try {
               var dbInfo = self.__dbInfo;
-              sessionStorage.set(dbInfo.keyPrefix + key, value);
+              sessionStorage.setItem(dbInfo.keyPrefix + key, value);
               resolve(originalValue);
             } catch (e) {
               if (e.name === 'QuotaExceededError' ||
@@ -7509,35 +7278,7 @@
 /* Inspired by Chuck Holloway's Move.JS */
 (function(self) {
   $(function() {
-    function require(name) {
-      var module = require.modules[name];
-      if (!module) throw new Error('failed to require "' + name + '"');
-
-      if (!('exports' in module) && typeof module.definition === 'function') {
-        module.client = module.component = true;
-        module.definition.call(this, module.exports = {}, module);
-        delete module.definition;
-      }
-
-      return module.exports;
-    }
-
-    require.modules = {};
-
-    require.register = function(name, definition) {
-      require.modules[name] = {
-        definition: definition
-      };
-    };
-
-    require.define = function(name, exports) {
-      require.modules[name] = {
-        exports: exports
-      };
-    };
-
-    require.register("transformProperty", function(exports, module) {
-
+    function transformProperty() {
       var styles = [
         'webkitTransform',
         'MozTransform',
@@ -7547,19 +7288,19 @@
 
       var el = document.createElement('p');
       var style;
-
+      var ret;
       for (var i = 0; i < styles.length; i++) {
         style = styles[i];
         if (null !== el.style[style]) {
-          module.exports = style;
+          ret = style;
           break;
         }
       }
-    });
+      return ret;
+    }
 
-    require.register("hasTranslate3d", function(exports, module) {
-
-      var prop = require('transformProperty');
+    function hasTranslate3d() {
+      var prop = transformProperty();
       var map = {
         webkitTransform: '-webkit-transform',
         msTransform: '-ms-transform',
@@ -7572,58 +7313,41 @@
       document.body.insertBefore(el, null);
       var val = getComputedStyle(el).getPropertyValue(map[prop]);
       document.body.removeChild(el);
-      module.exports = null !== val && val.length && 'none' != val;
-    });
+      return null !== val && val.length && 'none' != val;
+    }
 
-    require.register("hasTransitions", function(exports, module) {
-
-      exports = module.exports = function(el) {
-        switch (arguments.length) {
-          case 0:
-            return bool;
-          case 1:
-            return bool ? transitions(el) : bool;
-        }
-      };
-
-      function transitions(el, styl) {
-        if (el.transition) return true;
-        styl = window.getComputedStyle(el);
-        return !!parseFloat(styl.transitionDuration, 10);
-      }
-
+    function hasTransitions() {
       var styl = document.body.style;
-      var bool = 'transition' in styl || 'webkitTransition' in styl || 'MozTransition' in styl || 'msTransition' in styl;
+      return 'transition' in styl || 'webkitTransition' in styl || 'MozTransition' in styl || 'msTransition' in styl;
+    }
 
-    });
-
-    require.register("componentEvents", function(exports, module) {
+    function componentEvents() {
       var bind = 'addEventListener';
       var unbind = 'removeEventListener';
       var prefix = bind !== 'addEventListener' ? 'on' : '';
 
-      exports.bind = function(el, type, fn, capture) {
-        el[bind](prefix + type, fn, capture || false);
-        return fn;
-      };
+      return {
+        bind: function(el, type, fn, capture) {
+          el[bind](prefix + type, fn, capture || false);
+          return fn;
+        },
 
-      exports.unbind = function(el, type, fn, capture) {
-        el[unbind](prefix + type, fn, capture || false);
-        return fn;
-      };
-    });
+        unbind: function(el, type, fn, capture) {
+          el[unbind](prefix + type, fn, capture || false);
+          return fn;
+        }
+      }
+    }
 
-    require.register("cssEmitter", function(exports, module) {
+    function cssEmitter() {
 
-      var events = require('componentEvents');
+      var events = componentEvents();
 
       // CSS events:
 
       var watch = [
         'transitionend', 'webkitTransitionEnd', 'MSTransitionEnd', 'animationend', 'webkitAnimationEnd', 'MSAnimationEnd'
       ];
-
-      module.exports = CssEmitter;
 
       function CssEmitter(element) {
         if (!(this instanceof CssEmitter)) return new CssEmitter(element);
@@ -7654,14 +7378,19 @@
         self.bind(on);
         return this;
       };
-    });
 
-    require.register("once", function(exports, module) {
+      return CssEmitter;
+    }
+
+    function yieldsAafterTransition() {
+      var has = hasTransitions;
+      var emitter = cssEmitter();
+      var supported = has();
       var n = 0;
       var global = (function() {
         return this;
       })();
-      module.exports = function(fn) {
+      var once = function(fn) {
         var id = n++;
 
         function once() {
@@ -7680,16 +7409,7 @@
         }
 
         return once;
-      };
-
-    });
-
-    require.register("yieldsAafterTransition", function(exports, module) {
-      var has = require('hasTransitions'),
-        emitter = require('cssEmitter'),
-        once = require('once');
-      var supported = has();
-      module.exports = after;
+      }
 
       function after(el, fn) {
         if (!supported || !has(el)) return fn();
@@ -7703,12 +7423,10 @@
           callback();
         });
       };
+      return after
+    }
 
-    });
-
-    require.register("emitter", function(exports, module) {
-      module.exports = Emitter;
-
+    function emitter() {
       function Emitter(obj) {
         if (obj) return mixin(obj);
       }
@@ -7796,11 +7514,11 @@
       Emitter.prototype.hasListeners = function(event) {
         return !!this.listeners(event).length;
       };
+      return Emitter;
+    }
 
-    });
-
-    require.register("cssEase", function(exports, module) {
-      module.exports = {
+    function cssEase() {
+      return {
         'in': 'ease-in',
         'out': 'ease-out',
         'in-out': 'ease-in-out',
@@ -7840,296 +7558,293 @@
         'ease-in-back': 'cubic-bezier(0.600, -0.280, 0.735, 0.045)',
         'ease-out-back': 'cubic-bezier(0.175, 0.885, 0.320, 1.275)',
         'ease-in-out-back': 'cubic-bezier(0.680, -0.550, 0.265, 1.550)'
-
       };
+    }
 
-    });
+    function anim() {}
 
-    require.register("anim", function(exports, module) {
+    $.extend({
+      anim: (function() {
 
-      var Emitter = require('emitter');
+        var Emitter = emitter();
 
-      var query = function(selector) {
-        return document.querySelector(selector);
-      };
-
-      var after = require('yieldsAafterTransition');
-      var has3d = require('hasTranslate3d');
-      var ease = require('cssEase');
-      var translate = has3d ? ['translate3d(', ', 0)'] : ['translate(', ')'];
-      module.exports = Anim;
-      var style = window.getComputedStyle || window.currentStyle;
-
-      Anim.ease = ease;
-
-      Anim.defaults = {
-        duration: 500
-      };
-
-      // Default element selection used by anim(selector):
-      Anim.select = function(selector) {
-        return $(selector)[0];
-      };
-
-      // Initialize a new Anim with the given element:
-      function Anim(el) {
-        if (!(this instanceof Anim)) return new Anim(el);
-        if ('string' == typeof el) el = query(el);
-        if (!el) throw new TypeError('Anim must be initialized with element or selector');
-        this.el = el;
-        this._props = {};
-        this._rotate = 0;
-        this._transitionProps = [];
-        this._transforms = [];
-        this.duration(Anim.defaults.duration);
-        requestAnimationFrame(Anim)
-      }
-
-      // Inherit from EventEmitter.prototype:
-      Emitter(Anim.prototype);
-
-      // Buffer transform:
-      Anim.prototype.transform = function(transform) {
-        this._transforms.push(transform);
-        return this;
-      };
-
-      // Skew x and y:
-      Anim.prototype.skew = function(x, y) {
-        return this.transform('skew(' + x + 'deg, ' + (y || 0) + 'deg)');
-      };
-
-      // Skew x by n:
-      Anim.prototype.skewX = function(n) {
-        return this.transform('skewX(' + n + 'deg)');
-      };
-
-      // Skew y by n:
-      Anim.prototype.skewY = function(n) {
-        return this.transform('skewY(' + n + 'deg)');
-      };
-
-      // Translate x and y axis:
-      Anim.prototype.translate =
-        Anim.prototype.to = function(x, y) {
-          return this.transform(translate.join('' + x + 'px, ' + (y || 0) + 'px'));
+        var query = function(selector) {
+          return document.querySelector(selector);
         };
 
-      // Translate on x axis:
-      Anim.prototype.translateX =
-        Anim.prototype.x = function(n) {
-          return this.transform('translateX(' + n + 'px)');
-        };
+        var after = yieldsAafterTransition();
+        var has3d = hasTranslate3d();
+        var ease = cssEase();
+        var translate = has3d ? ['translate3d(', ', 0)'] : ['translate(', ')'];
+        // module.exports = Anim;
+        var style = window.getComputedStyle || window.currentStyle;
 
-      // Translate on y axis:
-      Anim.prototype.translateY =
-        Anim.prototype.y = function(n) {
-          return this.transform('translateY(' + n + 'px)');
-        };
-
-      // Scale x and y axis by x, or
-      // individually scale x and y:
-      Anim.prototype.scale = function(x, y) {
-        return this.transform('scale(' + x + ', ' + (y || x) + ')');
-      };
-
-      // Scale x axis by n
-      Anim.prototype.scaleX = function(n) {
-        return this.transform('scaleX(' + n + ')');
-      };
-
-      // Scale y axis by n
-      Anim.prototype.scaleY = function(n) {
-        return this.transform('scaleY(' + n + ')');
-      };
-
-      // Define matrix transform:
-      Anim.prototype.matrix = function(m11, m12, m21, m22, m31, m32) {
-        return this.transform('matrix(' + [m11, m12, m21, m22, m31, m32].join(',') + ')');
-      };
-
-      // Rotate n degrees:
-      Anim.prototype.rotate = function(n) {
-        return this.transform('rotate(' + n + 'deg)');
-      };
-
-      // Set transition easing function to fn string.
-      // Following shortcuts available:
-      // no argument - "ease" is used
-      // "in" - "ease-in" is used
-      // "out" - "ease-out" is used
-      // "in-out" - "ease-in-out" is used
-      Anim.prototype.ease = function(fn) {
-        fn = ease[fn] || fn || 'ease';
-        return this.setVendorProperty('transition-timing-function', fn);
-      };
-
-      // Set animation properties:
-      Anim.prototype.animate = function(name, props) {
-        for (var i in props) {
-          if (props.hasOwnProperty(i)) {
-            this.setVendorProperty('animation-' + i, props[i]);
-          }
+        // Initialize a new Anim with the given element:
+        function Anim(el) {
+          if (!(this instanceof Anim)) return new Anim(el);
+          if ('string' == typeof el) el = query(el);
+          if (!el) throw new TypeError('Anim must be initialized with element or selector');
+          this.el = el;
+          this._props = {};
+          this._rotate = 0;
+          this._transitionProps = [];
+          this._transforms = [];
+          this.duration(Anim.defaults.duration);
+          requestAnimationFrame(Anim)
         }
-        return this.setVendorProperty('animation-name', name);
-      };
+        Anim.ease = ease;
 
-      // Set duration to n milliseconds:
-      Anim.prototype.duration = function(n) {
-        n = this._duration = 'string' == typeof n ? parseFloat(n) * 1000 : n;
-        return this.setVendorProperty('transition-duration', n + 'ms');
-      };
+        Anim.defaults = {
+          duration: 500
+        };
 
-      // Delay the animation by n milliseconds:
-      Anim.prototype.delay = function(n) {
-        n = 'string' == typeof n ? parseFloat(n) * 1000 : n;
-        return this.setVendorProperty('transition-delay', n + 'ms');
-      };
+        // Default element selection used by anim(selector):
+        Anim.select = function(selector) {
+          return $(selector)[0];
+        };
 
-      // Set prop to val, deferred until .end() is invoked:
-      Anim.prototype.setProperty = function(prop, val) {
-        this._props[prop] = val;
-        return this;
-      };
+        // Inherit from EventEmitter.prototype:
+        Emitter(Anim.prototype);
 
-      // Set a vendor prefixed prop with the given val:
-      Anim.prototype.setVendorProperty = function(prop, val) {
-        this.setProperty('-webkit-' + prop, val);
-        this.setProperty('-moz-' + prop, val);
-        this.setProperty('-ms-' + prop, val);
-        return this;
-      };
-
-      // Set prop to value, deferred until .end() is invoked
-      // and adds the property to the list of transition props:
-      Anim.prototype.set = function(prop, val) {
-        this.transition(prop);
-        this._props[prop] = val;
-        return this;
-      };
-
-      // ncrement prop by val, deferred until .end() is invoked
-      // and adds the property to the list of transition props:
-      Anim.prototype.add = function(prop, val) {
-        if (!style) return;
-        var self = this;
-        return this.on('start', function() {
-          var curr = parseInt(self.current(prop), 10);
-          self.set(prop, curr + val + 'px');
-        });
-      };
-
-      // Decrement prop by val, deferred until .end() is invoked
-      // and adds the property to the list of transition props:
-      Anim.prototype.sub = function(prop, val) {
-        if (!style) return;
-        var self = this;
-        return this.on('start', function() {
-          var curr = parseInt(self.current(prop), 10);
-          self.set(prop, curr - val + 'px');
-        });
-      };
-
-      // Get computed or "current" value of prop:
-      Anim.prototype.current = function(prop) {
-        return style(this.el).getPropertyValue(prop);
-      };
-
-      // Add prop to the list of internal transition properties:
-      Anim.prototype.transition = function(prop) {
-        if (!this._transitionProps.indexOf(prop)) return this;
-        this._transitionProps.push(prop);
-        return this;
-      };
-
-      // Commit style properties, aka apply them to 
-      // the elemenet's style:
-      Anim.prototype.applyProperties = function() {
-        for (var prop in this._props) {
-          this.el.style.setProperty(prop, this._props[prop], '');
-        }
-        return this;
-      };
-
-      // Re-select element via selector, replacing
-      // the current element:
-      Anim.prototype.anim =
-        Anim.prototype.select = function(selector) {
-          this.el = Anim.select(selector);
+        // Buffer transform:
+        Anim.prototype.transform = function(transform) {
+          this._transforms.push(transform);
           return this;
         };
 
-      // Defer the given fn until the animation
-      // is complete:
-      Anim.prototype.then = function(fn) {
+        // Skew x and y:
+        Anim.prototype.skew = function(x, y) {
+          return this.transform('skew(' + x + 'deg, ' + (y || 0) + 'deg)');
+        };
 
-        // Invoke .end():
-        if (fn instanceof Anim) {
-          this.on('end', function() {
-            fn.run();
+        // Skew x by n:
+        Anim.prototype.skewX = function(n) {
+          return this.transform('skewX(' + n + 'deg)');
+        };
+
+        // Skew y by n:
+        Anim.prototype.skewY = function(n) {
+          return this.transform('skewY(' + n + 'deg)');
+        };
+
+        // Translate x and y axis:
+        Anim.prototype.translate =
+          Anim.prototype.to = function(x, y) {
+            return this.transform(translate.join('' + x + 'px, ' + (y || 0) + 'px'));
+          };
+
+        // Translate on x axis:
+        Anim.prototype.translateX =
+          Anim.prototype.x = function(n) {
+            return this.transform('translateX(' + n + 'px)');
+          };
+
+        // Translate on y axis:
+        Anim.prototype.translateY =
+          Anim.prototype.y = function(n) {
+            return this.transform('translateY(' + n + 'px)');
+          };
+
+        // Scale x and y axis by x, or
+        // individually scale x and y:
+        Anim.prototype.scale = function(x, y) {
+          return this.transform('scale(' + x + ', ' + (y || x) + ')');
+        };
+
+        // Scale x axis by n
+        Anim.prototype.scaleX = function(n) {
+          return this.transform('scaleX(' + n + ')');
+        };
+
+        // Scale y axis by n
+        Anim.prototype.scaleY = function(n) {
+          return this.transform('scaleY(' + n + ')');
+        };
+
+        // Define matrix transform:
+        Anim.prototype.matrix = function(m11, m12, m21, m22, m31, m32) {
+          return this.transform('matrix(' + [m11, m12, m21, m22, m31, m32].join(',') + ')');
+        };
+
+        // Rotate n degrees:
+        Anim.prototype.rotate = function(n) {
+          return this.transform('rotate(' + n + 'deg)');
+        };
+
+        // Set transition easing function to fn string.
+        // Following shortcuts available:
+        // no argument - "ease" is used
+        // "in" - "ease-in" is used
+        // "out" - "ease-out" is used
+        // "in-out" - "ease-in-out" is used
+        Anim.prototype.ease = function(fn) {
+          fn = ease[fn] || fn || 'ease';
+          return this.setVendorProperty('transition-timing-function', fn);
+        };
+
+        // Set animation properties:
+        Anim.prototype.animate = function(name, props) {
+          for (var i in props) {
+            if (props.hasOwnProperty(i)) {
+              this.setVendorProperty('animation-' + i, props[i]);
+            }
+          }
+          return this.setVendorProperty('animation-name', name);
+        };
+
+        // Set duration to n milliseconds:
+        Anim.prototype.duration = function(n) {
+          n = this._duration = 'string' == typeof n ? parseFloat(n) * 1000 : n;
+          return this.setVendorProperty('transition-duration', n + 'ms');
+        };
+
+        // Delay the animation by n milliseconds:
+        Anim.prototype.delay = function(n) {
+          n = 'string' == typeof n ? parseFloat(n) * 1000 : n;
+          return this.setVendorProperty('transition-delay', n + 'ms');
+        };
+
+        // Set prop to val, deferred until .end() is invoked:
+        Anim.prototype.setProperty = function(prop, val) {
+          this._props[prop] = val;
+          return this;
+        };
+
+        // Set a vendor prefixed prop with the given val:
+        Anim.prototype.setVendorProperty = function(prop, val) {
+          this.setProperty('-webkit-' + prop, val);
+          this.setProperty('-moz-' + prop, val);
+          this.setProperty('-ms-' + prop, val);
+          return this;
+        };
+
+        // Set prop to value, deferred until .end() is invoked
+        // and adds the property to the list of transition props:
+        Anim.prototype.set = function(prop, val) {
+          this.transition(prop);
+          this._props[prop] = val;
+          return this;
+        };
+
+        // ncrement prop by val, deferred until .end() is invoked
+        // and adds the property to the list of transition props:
+        Anim.prototype.add = function(prop, val) {
+          if (!style) return;
+          var self = this;
+          return this.on('start', function() {
+            var curr = parseInt(self.current(prop), 10);
+            self.set(prop, curr + val + 'px');
+          });
+        };
+
+        // Decrement prop by val, deferred until .end() is invoked
+        // and adds the property to the list of transition props:
+        Anim.prototype.sub = function(prop, val) {
+          if (!style) return;
+          var self = this;
+          return this.on('start', function() {
+            var curr = parseInt(self.current(prop), 10);
+            self.set(prop, curr - val + 'px');
+          });
+        };
+
+        // Get computed or "current" value of prop:
+        Anim.prototype.current = function(prop) {
+          return style(this.el).getPropertyValue(prop);
+        };
+
+        // Add prop to the list of internal transition properties:
+        Anim.prototype.transition = function(prop) {
+          if (!this._transitionProps.indexOf(prop)) return this;
+          this._transitionProps.push(prop);
+          return this;
+        };
+
+        // Commit style properties, aka apply them to 
+        // the elemenet's style:
+        Anim.prototype.applyProperties = function() {
+          for (var prop in this._props) {
+            this.el.style.setProperty(prop, this._props[prop], '');
+          }
+          return this;
+        };
+
+        // Re-select element via selector, replacing
+        // the current element:
+        Anim.prototype.anim =
+          Anim.prototype.select = function(selector) {
+            this.el = Anim.select(selector);
+            return this;
+          };
+
+        // Defer the given fn until the animation
+        // is complete:
+        Anim.prototype.then = function(fn) {
+
+          // Invoke .end():
+          if (fn instanceof Anim) {
+            this.on('end', function() {
+              fn.run();
+            });
+
+            // Callback
+          } else if ('function' == typeof fn) {
+            this.on('end', fn);
+
+            // Chain:
+          } else {
+            var clone = new Anim(this.el);
+            clone._transforms = this._transforms.slice(0);
+            this.then(clone);
+            clone.parent = this;
+            return clone;
+          }
+
+          return this;
+        };
+
+        // Return parent:
+        Anim.prototype.pop = function() {
+          return this.parent;
+        };
+
+        // Reset duration:
+        Anim.prototype.reset = function() {
+          this.el.style.webkitTransitionDuration =
+            this.el.style.mozTransitionDuration =
+            this.el.style.msTransitionDuration =
+            this.el.style.oTransitionDuration = '';
+          return this;
+        };
+
+        Anim.prototype.run = function(fn) {
+          var self = this;
+
+          // Emit "start" event:
+          this.emit('start');
+
+          // Transforms:
+          if (this._transforms.length) {
+            this.setVendorProperty('transform', this._transforms.join(' '));
+          }
+
+          // Transition properties:
+          this.setVendorProperty('transition-properties', this._transitionProps.join(', '));
+          this.applyProperties();
+
+          // Callback given:
+          if (fn) this.then(fn);
+
+          // Emit "end" when complete:
+          after.once(this.el, function() {
+            self.reset();
+            self.emit('end');
           });
 
-          // Callback
-        } else if ('function' == typeof fn) {
-          this.on('end', fn);
-
-          // Chain:
-        } else {
-          var clone = new Anim(this.el);
-          clone._transforms = this._transforms.slice(0);
-          this.then(clone);
-          clone.parent = this;
-          return clone;
-        }
-
-        return this;
-      };
-
-      // Return parent:
-      Anim.prototype.pop = function() {
-        return this.parent;
-      };
-
-      // Reset duration:
-      Anim.prototype.reset = function() {
-        this.el.style.webkitTransitionDuration =
-          this.el.style.mozTransitionDuration =
-          this.el.style.msTransitionDuration =
-          this.el.style.oTransitionDuration = '';
-        return this;
-      };
-
-      Anim.prototype.run = function(fn) {
-        var self = this;
-
-        // Emit "start" event:
-        this.emit('start');
-
-        // Transforms:
-        if (this._transforms.length) {
-          this.setVendorProperty('transform', this._transforms.join(' '));
-        }
-
-        // Transition properties:
-        this.setVendorProperty('transition-properties', this._transitionProps.join(', '));
-        this.applyProperties();
-
-        // Callback given:
-        if (fn) this.then(fn);
-
-        // Emit "end" when complete:
-        after.once(this.el, function() {
-          self.reset();
-          self.emit('end');
-        });
-
-        return this;
-      };
-
-    });
-
-    $.extend({
-      anim: require('anim')
+          return this;
+        };
+        return Anim;
+      })()
     })
   });
 })(window);
@@ -8239,15 +7954,12 @@
       AdjustNavbarLayout: function(screen) {
         if (!$('link[href*=ios]')[0]) return;
         screen = $(screen);
-        var siblings = screen.find('h1').siblings();
+        var h1 = screen.find('h1');
+        var siblings = h1.siblings();
         var whichSide;
         var oppositeSide;
         var rtl = ($('html').attr('dir') === 'rtl');
         var amount = 0;
-        var padding = 20;
-        var oppositeAmount = 25;
-        var h1 = screen.find('h1');
-        var navWidth = screen.find('nav').width();
         var hidden = false;
         var visibleSibling;
 
@@ -8294,8 +8006,8 @@
         };
 
         function handleOneSibling(sib) {
-          var sibling = sib || h1.siblings().eq(0);
-          amount = sibling.width();
+          var sibling = sib || h1.siblings();
+          amount = sibling[0].clientWidth;
           if (sibling.is(':first-child')) {
             whichSide = 'margin-right';
             oppositeSide = 'margin-left';
@@ -8312,6 +8024,7 @@
             }
           }
         }
+
         // If one sibling:
         if (siblings.length === 1) {
           handleOneSibling();
@@ -8339,13 +8052,14 @@
         }
         var props = {};
         props[whichSide] = amount;
-        props[oppositeSide] = 0;
+        // props[oppositeSide] = 0;
         var sibwidth = 0;
         if (siblings.size()) {
           siblings.forEach(function(item) {
-            sibwidth += $(item).width();
+            sibwidth += $(item)[0].clientWidth;
           });
         }
+        // alert(amount)
         var headerWidth = screen.find('nav').width() / 2;
         if ((sibwidth + 20) > headerWidth) {
           h1.css({
@@ -8357,8 +8071,10 @@
         }
       }
     });
-    $('screen').forEach(function(screen) {
-      $.AdjustNavbarLayout(screen);
+    setTimeout(function() {
+      $('screen').forEach(function(screen) {
+        $.AdjustNavbarLayout(screen);
+      });
     });
   });
 })();
@@ -8482,7 +8198,6 @@
       // Navigate Back to Non-linear Article
       //////////////////////////////////////
       GoBackToScreen: function(destination) {
-        var currentScreen = $.screens.getCurrent();
         var position = $.TruckRoutes.index(destination);
         var destinationScreen = getScreen(destination);
         var temp;
@@ -8638,7 +8353,6 @@
       selectedScreen = $('screen').eq(settings.selected);
       setToCurrent(selectedScreen);
 
-      var tempIdx;
       if (settings.labels.length) {
         settings.labels.forEach(function(label, idx) {
           tabbarTmpl.append(makeTab(label, settings.icons[idx], idx));
@@ -8786,8 +8500,6 @@
       });
 
       $('slideout').on('tap', 'li', function() {
-        var routes = $(this).attr('data-show').split('/');
-        var fullRoute = $.TruckRoutes.getFullRoute();
         var menuItems = slideout.find('li[data-show]');
         slideout.attr('aria-hidden', 'true')
 
@@ -8883,11 +8595,7 @@
       }
       var __view = settings.view;
 
-      var editLabel = settings.editLabel;
-      var doneLabel = settings.doneLabel;
-      var deleteLabel = settings.deleteLabel;
-      var placement = settings.placement;
-      var callback = settings.callback;
+      if (options) $.extend(settings, options);
 
       var deleteButton;
       var editButton;
@@ -8898,6 +8606,7 @@
       var moveUpIndicator;
       var moveDownIndicator;
       var element = settings.element;
+      var deleteLabel;
 
       var dir = $('html').attr('dir');
       dir = dir ? dir.toLowerCase() : '';
@@ -8910,7 +8619,7 @@
       }
 
       if (settings.deletable) {
-        deleteButton = $.concat('<button class="delete"><label>', deleteLabel, '</label><svg width="27px" height="30px" viewBox="0 0 27 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="delete-icon" fill="#3A3A3A"><g transform="translate(3.000000, 1.000000)"><path d="M1,6 L20,6 L20,24.9986131 C20,26.6562333 18.6639569,28 16.9998779,28 L4.00012207,28 C2.3432004,28 1,26.6569187 1,24.9986131 L1,6 Z M4,9 L5,9 L5,25 L4,25 L4,9 Z M8,9 L9,9 L9,25 L8,25 L8,9 Z M12,9 L13,9 L13,25 L12,25 L12,9 Z M16,9 L17,9 L17,25 L16,25 L16,9 Z" id="can"></path><path d="M0,4.96611425 L0,1.67759301 L5.1776507,1.7511163 L6.482399,0 L14.5847825,0 L15.8789491,1.7511163 L21,1.7511163 L21,4.9447157 L0,4.96611425 L0,4.96611425 Z" id="lid"></path></g></g></g></svg></button>');
+        deleteButton = $.concat('<button class="delete"><label>', settings.deleteLabel, '</label><svg width="27px" height="30px" viewBox="0 0 27 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="delete-icon" fill="#3A3A3A"><g transform="translate(3.000000, 1.000000)"><path d="M1,6 L20,6 L20,24.9986131 C20,26.6562333 18.6639569,28 16.9998779,28 L4.00012207,28 C2.3432004,28 1,26.6569187 1,24.9986131 L1,6 Z M4,9 L5,9 L5,25 L4,25 L4,9 Z M8,9 L9,9 L9,25 L8,25 L8,9 Z M12,9 L13,9 L13,25 L12,25 L12,9 Z M16,9 L17,9 L17,25 L16,25 L16,9 Z" id="can"></path><path d="M0,4.96611425 L0,1.67759301 L5.1776507,1.7511163 L6.482399,0 L14.5847825,0 L15.8789491,1.7511163 L21,1.7511163 L21,4.9447157 L0,4.96611425 L0,4.96611425 Z" id="lid"></path></g></g></g></svg></button>');
         deletionIndicator = '<span class="deletion-indicator"><svg width="20px" height="20px" viewBox="0 0 20 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="deletion-indicator"><g id="ios-indicator"><circle id="ios-circle" fill="#FF0000" cx="10" cy="10" r="10"></circle><path d="M3.5,10 L16.5,10" id="ios-bar" stroke="#FFFFFF" stroke-width="2" stroke-linecap="square"></path></g><path d="M2,13 L9.9294326,16.8406135 L17.1937075,1.90173332" id="checkmark" stroke="#FA0303" stroke-width="2"></path></g></g></svg></span>';
         $(element).addClass('deletable');
       }
@@ -8920,7 +8629,7 @@
         $(element).addClass('editable');
       }
 
-      editButton = $.concat('<button class="edit">', editLabel, '</button>');
+      editButton = $.concat('<button class="edit">', settings.editLabel, '</button>');
       var nav = $(element).closest('screen').find('nav');
       nav.append(editButton);
       nav.find('.back').hide();
@@ -9162,7 +8871,6 @@
       var __passed = false;
       var __errors = [];
       var __result = [];
-      var customValidation;
 
       // Helper to validate form elements:
       //==================================
@@ -9338,9 +9046,8 @@
             }
         }
         if (item.type.match(/custom/)) {
-          customValidation = item.type.split('custom-')[1];
           var cv = $.customValidators.filter(function(validator) {
-            return (validator.name) === customValidation;
+            return (validator.name) === item.type;
           });
           if (cv) {
             var result = $.validateWithRegex(item.element, cv[0].regex);
@@ -9470,7 +9177,6 @@
       var selections = settings.selected;
       var name = settings.name;
       var list = $(settings.element);
-      var multiSelectIcon = '<svg width="30px" height="30px" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd"><g id="multi-select-icon" stroke="#979797"><g id="multi-select-circle-+-mulit-select-checkmark" transform="translate(2.000000, 2.000000)"><circle id="multi-select-circle" cx="13" cy="13" r="13"></circle><path d="M4.71521456,15.9877529 L13.0000002,20.7028494 L19.977049,5.70284941" id="mulit-select-checkmark"></path></g></g></g></svg>';
       list.addClass('multi-select-list');
       list.find('li').forEach(function(ctx, idx) {
         var value = ctx.getAttribute("data-select") !== null ? ctx.getAttribute("data-select") : "";
@@ -9508,7 +9214,6 @@
         if (item.hasClass('selected')) {
           item.removeClass('selected').removeAttr('aria-checked');
           item.find('input').removeProp('checked');
-          var whichItem = item.index();
           var dataObj = {
             index: item.index(),
             value: item.attr('data-select')
@@ -9553,7 +9258,6 @@
     // Create a switch control:
     //=========================
     Switch: function(options) {
-      var self = this;
       if (!options || !options.element) return;
       var __checked = false;
       var settings = {
@@ -9710,7 +9414,8 @@
       var cancelButton = options.cancelButton ? '<button class="cancel" role="button">' + settings.cancelButton + '</button>' : '';
       var continueButton = settings.continueButton ? '<button class="continue" role="button">' + settings.continueButton + '</button>' : '';
       var callback = settings.callback || $.noop;
-      var panelOpen, panelClose, popup;
+      var panelClose;
+      var popup;
       if (settings.empty) {
         popup = $.concat('<div' + width + ' class="popup closed" role="alertdialog" id="', id, '"></div>');
       } else {
@@ -9831,7 +9536,6 @@
 
         var segmented;
         var labels = (settings.labels) ? settings.labels : [];
-        var selected = settings.selected;
         var __selection;
 
         function createSegmentedButton() {
@@ -10063,7 +9767,7 @@
     // Create a stepper:
     //==================
     Stepper: function(options) {
-      if (!options) return $();
+      if (!options) return;
       if (!options.element) return;
       if (!options.min) return;
       if (!options.max) return;
@@ -10330,10 +10034,10 @@
       var iOSBusy = function() {
         var small;
         if (parseInt(settings.size, 10) < 30) {
-          spinner = "<svg class='busy' width='" + settings.size + "px' height='" + settings.size + "px' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid'>  <g x='0' y='0' width='100' height='100' fill='none' class='bk'><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(0 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(45 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.125s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(90 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.25s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(135 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.375s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(180 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.5s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(225 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.625s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(270 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.75s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(315 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.875s' repeatCount='indefinite'/></rect></g></svg>";
+          spinner = "<svg class='truck-busy small' width='" + settings.size + "px' height='" + settings.size + "px' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid'>  <g x='0' y='0' width='100' height='100' fill='none' class='bk'><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(0 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(45 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(90 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(135 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(180 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(225 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(270 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(315 50 50) translate(0 -30)'></rect></g></svg>";
           $this.append(spinner);
         } else {
-          spinner = "<svg class='busy' width='" + settings.size + "px' height='" + settings.size + "px' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid' class='uil-default'> <g x='0' y='0' width='100' height='100' fill='none'><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(0 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(30 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.08333333333333333s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(60 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.16666666666666666s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(90 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.25s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(120 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.3333333333333333s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(150 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.4166666666666667s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(180 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.5s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(210 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.5833333333333334s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(240 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.6666666666666666s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(270 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.75s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(300 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.8333333333333334s' repeatCount='indefinite'/></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(330 50 50) translate(0 -30)'><animate attributeName='opacity' from='1' to='0' dur='1s' begin='0.9166666666666666s' repeatCount='indefinite'/></rect> </g></svg>";
+          spinner = "<svg class='truck-busy' width='" + settings.size + "px' height='" + settings.size + "px' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='xMidYMid' class='uil-default'> <g x='0' y='0' width='100' height='100' fill='none'><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(0 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(30 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(60 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(90 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(120 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(150 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(180 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(210 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(240 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(270 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(300 50 50) translate(0 -30)'></rect><rect  x='46.5' y='40' width='7' height='20' rx='5' ry='5' fill='" + settings.color + "' transform='rotate(330 50 50) translate(0 -30)'></rect></g></svg>";
           $this.append(spinner);
         }
       };
@@ -10344,12 +10048,12 @@
         var androidActivityIndicator = null;
         var position = settings.position ? (' ' + settings.position) : '';
         if ($.isNativeAndroid) {
-          androidActivityIndicator = '<svg class="busy' + position + '" version="1.1" id="' + settings.id + '" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 100 100" enable-background="new 0 0 100 100" xml:space="preserve"><g><path fill="none" stroke="' + settings.color + '" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" d="M74.2,65c2.7-4.4,4.3-9.5,4.3-15c0-15.7-12.8-28.5-28.5-28.5S21.5,34.3,21.5,50c0,5.5,1.6,10.6,4.3,15"/></g><polyline fill="none" stroke="' + settings.color + '" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="89.4,56.1 74.3,65 65.4,49.9 "/></svg>';
+          androidActivityIndicator = '<svg class="truck-busy' + position + '" version="1.1" id="' + settings.id + '" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 100 100" enable-background="new 0 0 100 100" xml:space="preserve"><g><path fill="none" stroke="' + settings.color + '" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" d="M74.2,65c2.7-4.4,4.3-9.5,4.3-15c0-15.7-12.8-28.5-28.5-28.5S21.5,34.3,21.5,50c0,5.5,1.6,10.6,4.3,15"/></g><polyline fill="none" stroke="' + settings.color + '" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" points="89.4,56.1 74.3,65 65.4,49.9 "/></svg>';
 
           $this.append(androidActivityIndicator);
           return;
         } else {
-          androidActivityIndicator = '<svg id="' + settings.id + '" class="busy' + position + '" x="0px" y="0px" viewBox="0 0 100 100"><circle stroke="url(#SVGID_1_)" cx="50" cy="50" r="28.5"/></svg>';
+          androidActivityIndicator = '<svg id="' + settings.id + '" class="truck-busy' + position + '" x="0px" y="0px" viewBox="0 0 100 100"><circle stroke="url(#SVGID_1_)" cx="50" cy="50" r="28.5"/></svg>';
           $this.append(androidActivityIndicator);
           $this.addClass('hasActivityIndicator');
           if (settings.position) {
@@ -10368,7 +10072,7 @@
 
       // For Windows 8/WP8:
       var winBusy = function() {
-        var spinner = $('<progress class="busy"></progress>');
+        var spinner = $('<progress class="truck-busy"></progress>');
         $(spinner).css({
           'color': settings.color
         });
