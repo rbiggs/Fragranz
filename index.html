@@ -32,8 +32,8 @@
       <h2 class='wrap normal-case'>Choose from one of the categories below to see which fragrances are available.</h2>
       <ul class='list' id='fragranceGenres'>
         <script type="text/x-template">
-          <li class='nav' data-goto='fragranceList:${ data }'>
-            <h3>${ data }</h3>
+          <li class='nav' data-goto='fragranceList:{= data }'>
+            <h3>{= data }</h3>
             <aside>
               <disclosure></disclosure>
             </aside>
@@ -49,20 +49,20 @@
   <screen class='next' id='fragranceList'>
     <nav>
       <button class='back'>Fragrances</button>
-      <h1 id='fragrancesGenreTitle'>${ title }</h1>
+      <h1 id='fragrancesGenreTitle'>{= title }</h1>
     </nav> 
     <section>
       <ul class='list' id='availableFragrances'>
         <script type="text/x-template">
-          <li data-goto='detail:${ fragrance.sku }'>
-            <img width='60' data-src='${ fragrance.img_prev }'>
+          <li data-goto='detail:{= fragrance.sku }'>
+            <img width='60' data-src='{= fragrance.img_prev }'>
             <div>
-              <h3 class='productTitle'>${ fragrance.product_title }</h3>
-              <h4>${ fragrance.sku }</h4>
-              <h4>${ fragrance.short_description }</h4>
+              <h3 class='productTitle'>{= fragrance.product_title }</h3>
+              <h4>{= fragrance.sku }</h4>
+              <h4>{= fragrance.short_description }</h4>
             </div>
             <aside class='price'>
-              <span>$${ fragrance.wholesale_price }</span>
+              <span>${= fragrance.wholesale_price }</span>
               <info></info>
             </aside>
           </li>
@@ -74,18 +74,18 @@
   <screen class='next' id='detail'>
     <nav id='detailNavbar'>
       <button class='back' id='backToGenre'></button>
-      <h1 id='detailTitle'>${ title }</h1>
+      <h1 id='detailTitle'>{= title }</h1>
     </nav>
     <section>
       <ul class='list' id='fragranceDetail'>
         <script type="text/x-template">
           <li>
-            <img src="${ chosenFragrance.img_prev }">
+            <img src="{= chosenFragrance.img_prev }">
             <div>
-              <h3 class="productTitle">${ chosenFragrance.product_title }</h3>
-              <h4><span class="sku">SKU: ${ chosenFragrance.sku }</span></h4>
-              <h4 class="counter flush">$${ chosenFragrance.wholesale_price }</h4>
-              <p class="longDescription">${ chosenFragrance.long_description }</p>
+              <h3 class="productTitle">{= chosenFragrance.product_title }</h3>
+              <h4><span class="sku">SKU: {= chosenFragrance.sku }</span></h4>
+              <h4 class="counter flush">${= chosenFragrance.wholesale_price }</h4>
+              <p class="longDescription">{= chosenFragrance.long_description }</p>
             </div>
           </li>
         </script>
@@ -112,10 +112,10 @@
         <script type="text/x-template">
           <li>
             <div>
-              <h3>${ item.product_title }</h3>
-              <h4>SKU: ${ item.sku }</h4>
+              <h3>{= item.product_title }</h3>
+              <h4>SKU: {= item.sku }</h4>
             </div>
-            <aside class='price'><span>Price: ${ $.currency(item.wholesale_price) }</span></aside>
+            <aside class='price'><span>Price: {= $.currency(item.wholesale_price) }</span></aside>
           </li>
         </script>
       </ul>
@@ -123,11 +123,11 @@
       <ul class="list">
         <li>
           <h3>Total Items:</h3>
-          <h4 id="totalItems">${ total }</h4>
+          <h4 id="totalItems">{= total }</h4>
         </li>
         <li>
           <h3>Total Cost:</h3>
-          <h4 id="totalCost">${ total }</h4>
+          <h4 id="totalCost">{= total }</h4>
         </li>
       </ul>
       <div id='orderButtons'>
@@ -155,14 +155,14 @@
       <ul class="list" id='purchaseDetails'>
         <script type="text/x-template">
           <li>
-            <h3><span>${ item.genre }</span>: ${ item.product_title }</h3>
+            <h3><span>{= item.genre }</span>: {= item.product_title }</h3>
           </li>
         </script>
       </ul>
       <h2>Total Amount Charged:</h2>
       <ul class="list">
         <li>
-          <h3 id="confirmTotalCost">${ cost }</h3>
+          <h3 id="confirmTotalCost">{= cost }</h3>
         </li>
       </ul>
     </section>

@@ -1,9 +1,9 @@
 /**
- * Interface for TruckJS.
- * This is a multi-purpose singleton, similar in purpose to jQuery.
- * It runs callbacks when the DOM in ready, and enables find elements in the DOM through its selector engine.
- * It also provides a way to create new DOM elements, as well as an extension facility to add further functionality to itself and other objects.
- */
+  * Interface for TruckJS.
+  * This is a multi-purpose singleton, similar in purpose to jQuery.
+  * It runs callbacks when the DOM in ready, and enables find elements in the DOM through its selector engine.
+  * It also provides a way to create new DOM elements, as well as an extension facility to add further functionality to itself and other objects.
+  */
 interface TruckStatic {
   /**
    * Accepts a string containing a CSS selector which is then used to match a set of elements.
@@ -12,7 +12,7 @@ interface TruckStatic {
    * @param context A DOM HTMLElement to use as context
    * @return DOMStack
    */
-  (selector: string | HTMLElement | Element | Document, context?: HTMLElement | DOMStack): Truck;
+  (selector: string | HTMLElement | Element | Document | DOMStack, context?: string | HTMLElement | Element | DOMStack): Truck;
 
   /**
    * Binds a function to be executed when the DOM has finished loading.
@@ -135,6 +135,14 @@ interface TruckStatic {
    * @param callback A callback to execute on each element. This has two parameters: the index of the current iteration, followed by the context.
    */
   each<T>(array: T[], callback: (idx: number, ctx: T) => any): any;
+
+  /**
+   * This method removes all duplicates from an array. This works with simple arrays or collections of objects.
+   *
+   * @param array An array are to process.
+   * @return array Returns an array of unique items.
+   */
+  unique<T>(array: T[]): any[];
 
   /**
    * Determine the internal JavaScript type of an object. 
@@ -397,75 +405,6 @@ interface TruckStatic {
    */
   receive(handle: string, callback: (data: any) => any): string;
 
-  /**
-   * This method creates a Mediator object.
-   *
-   * @param handle A string defined the handle that the mediator listens to.
-   * @return Mediator A Mediator object.
-   */
-  Mediator: {
-
-    /**
-      * This method lets you create a mediator. It takes two arguments: a handle and a callback. The callback gets as its argument any data passed when the mediator is run or a dispatch sent to its handle.
-      *
-      * @param handle A string defining a handle for the mediator.
-      * @param callback A callback to execute when the mediator runs.
-      * @retun void
-      */
-    (handle: string, callback: (data: any) => void): {
-
-      /**
-        * This runs the mediator. Any data provided as an argument will be consumed by the mediators callback defined in its `init` method.
-        *
-        * @param data Any data you want to pass to the mediator.
-        * @return void
-        */
-      run(data?: any): void;
-
-      /**
-        * Immediately stop a mediator. After this the mediator will no longer respond to attempts to run. Once stopped, it can be restarted again with the `restart()` method.
-        *
-        * @return void
-        */
-      stop(): void;
-
-      /**
-        * Tell a mediator to stop running after the designated number of times. Once stopped, it can be restarted again with the `restart()` method.
-        *
-        * @param after The number of times afterwhich the mediator will stop.
-        * @return: void
-        */
-      stop(after: number): void;
-
-      /**
-        * Immediately allow a stopped mediator to respond to run commands.
-        *
-        * @return void
-        */
-      start(): void;
-
-
-      /**
-        * The number of times the mediator has run.
-        */
-      count: number;
-
-      /**
-        * Reset to zero the number used by the mediator for keeping track of how many times it has run.
-        *
-        * @return void
-        */
-      resetCount(): void;
-
-      /**
-        * Stop the mediator from counting how many times it has run.
-        *
-        * @return void
-        */
-      stopCount(): void;
-    }
-    dispatch(handle: string, data?: any): void;
-  }
 
   /** 
    * Method to dispatch a handle and any provided data. This can be intercepted by any receivers listening to the provided handle.
@@ -490,53 +429,6 @@ interface TruckStatic {
    */
   startDispatch(handleOrMediator: any): void;
 
-  /**
-   * This method creates a Stack object, which is an abstraction for array. You can also use this with a mediator. Just pass the mediator as the argument: `$.startDispatch(MyMediator)`.
-   *
-   * @param data The data to encapsulate in the stack
-   * @return Stack A new instance of Stack.
-   */
-  Stack(data: any[]): Stack;
-
-  /**
-   * This method creates a Model object.
-   *
-   * @param data The data to encapsulate in the Model.
-   * @param handle A string used to describe and identify the model to the system. This is used by Mediators and Dispatchers.
-   * @return Model A Model object.
-   */
-  Model(data: any, handle: string): Model;
-
-  /**
-   * This method create a View object.
-   *
-   * options An object of key/value pairs to initialize the view.
-   * @return View A View object.
-   */
-  View(options: {
-    element: string;
-    template?: string;
-    noTemplate?: boolean;
-    model?: Model;
-    variable?: string;
-    events?: any[];
-    startIndexFrom?: number;
-    escapeHTML?: boolean;
-  }): View;
-
-  /**
-   * This method sets up a component. This is a reusable view factory. It takes the same arguments as a view, minus the element property.
-   *
-   * @param 
-   * @return View
-   */
-  Component(options: {
-    template?: string;
-    variable?: string;
-    events?: any[];
-    startIndexFrom?: number;
-    escapeHTML?: boolean;
-   }): View;
 
   /**
    * Get the current screen.
@@ -553,10 +445,7 @@ interface TruckStatic {
    */
   getPrevious(): Truck;
 
-  TruckRoutes: Model;
-
-  Router(): Router;
-
+  TruckRoutes: TruckRoutes;
 
   /**
    * A cache to hold callbacks execute by the response from a JSONP request. This is an array of strings. By default these values get purged when the callback execute and exposes the data returned by the request.
@@ -819,9 +708,94 @@ interface TruckStatic {
    * Method to create chainable animations. This takes properties and values and converts them into CSS animations. It expects an element to animate. This can be a valid CSS selector, a DOM node or a DOMStack.
    */
   anim(element: string | Element | DOMStack): Anim;
-
 }
 
+
+/**
+  * This method creates a Mediator object.
+  *
+  * @param handle A string defined the handle that the mediator listens to.
+  * @return Mediator A Mediator object.
+  */
+interface Mediator {
+
+  /**
+   * This method lets you create a mediator. It takes two arguments: a handle and a callback. The callback gets as its argument any data passed when the mediator is run or a dispatch sent to its handle.
+   *
+   * @param handle A string defining a handle for the mediator.
+   * @param callback A callback to execute when the mediator runs.
+   * @retun void
+   */
+  (handle: string, callback: (data: any) => void): {
+
+    /**
+     * This runs the mediator. Any data provided as an argument will be consumed by the mediators callback defined in its `init` method.
+     *
+     * @param data Any data you want to pass to the mediator.
+     * @return void
+     */
+    run(data?: any): void;
+
+    /**
+     * Immediately stop a mediator. After this the mediator will no longer respond to attempts to run. Once stopped, it can be restarted again with the `restart()` method.
+     *
+     * @return void
+     */
+    stop(): void;
+
+    /**
+     * Tell a mediator to stop running after the designated number of times. Once stopped, it can be restarted again with the `restart()` method.
+     *
+     * @param after The number of times afterwhich the mediator will stop.
+     * @return: void
+     */
+    stop(after: number): void;
+
+    /**
+     * Immediately allow a stopped mediator to respond to run commands.
+     *
+     * @return void
+     */
+    start(): void;
+
+
+    /**
+     * The number of times the mediator has run.
+     */
+    count: number;
+
+    /**
+     * Reset to zero the number used by the mediator for keeping track of how many times it has run.
+     *
+     * @return void
+     */
+    resetCount(): void;
+
+    /**
+     * Stop the mediator from counting how many times it has run.
+     *
+     * @return void
+     */
+    stopCount(): void;
+  }
+  dispatch(handle: string, data?: any): void;
+}
+
+/**
+ * This method sets up a component. This is a reusable view factory. It takes the same arguments as a view, minus the element property.
+ *
+ * @param 
+ * @return View
+ */
+interface Component {
+  new (options: {
+    template?: string;
+    variable?: string;
+    events?: any[];
+    startIndexFrom?: number;
+    escapeHTML?: boolean;
+    }): View;
+}
 /**
  * Interface for Anim
  */
@@ -1036,8 +1010,16 @@ interface Anim {
  * Interface for DOMStack.
  * This is an abstraction container for DOM Nodes, similar to a NodeList that allows Truck to add custom functions to manipulate collections of elements without directly modifying native methods.
  */
-interface DOMStack extends Object {
-  (args: any): Truck;
+interface DOMStack {
+  /**
+   * Creates a new instance of a DOMStack.
+   *
+   * @param Element A DOM node.
+   * @param HTMLElement A DOM element.
+   * @param NodeList A collection of DOM nodes.
+   * @param any[] An array of elements/nodes.
+   */
+  new (args?: Element | HTMLElement | NodeList | any[]): Truck;
 
   /**
    * This method returns the element at the position in the array indicated by the argument. This is a zero-based number.
@@ -1802,11 +1784,11 @@ interface Truck extends DOMStack {
   off(eventType?: string | Event, selector?: any, handler?: (eventObject: Event) => any, capturePhase?: boolean): Truck;
 
   /**
-  * Trigger an event on an element.
-  * 
-  * @param eventType The event to trigger.
-  * @return void
-  */
+   * Trigger an event on an element.
+   * 
+   * @param eventType The event to trigger.
+   * @return void
+   */
   trigger(eventType: string | Event): void;
 
   /** 
@@ -1984,9 +1966,23 @@ interface Truck extends DOMStack {
 }
 
 /**
+ * Interface for TruckRoutes
+ */
+interface TruckRoutes {
+  getFullRoute(): string;
+}
+/**
  * Interface for Stack, an abstraction for arrays.
  */
 interface Stack {
+
+  /**
+   * This method creates a Stack object, which is an abstraction for array. You can also use this with a mediator. Just pass the mediator as the argument: `$.startDispatch(MyMediator)`.
+   *
+   * @param data The data to encapsulate in the stack
+   * @return Stack A new instance of Stack.
+   */
+  new (data: any[]): Stack;
 
   /**
    * Returns the number of items in the stack.
@@ -2167,158 +2163,166 @@ interface Stack {
 /** 
  * Interface for Model
  */
- interface Model {
-   (data: any, handel: string): Model;
-   /**
-    * Returns the key used by Box for storing the model for local persistence.
-    *
-    * return key The key used by Box when a model is boxed or set to auto-box. This key is used to store the model in whatever store Box is using for the current browser.
-    */
-   key(): string
+interface Model {
+  /**
+   * This method creates a Model object.
+   *
+   * @param data The data to encapsulate in the Model.
+   * @param handle A string used to describe and identify the model to the system. This is used by Mediators and Dispatchers.
+   * @return Model A Model object.
+   */
+  new (data: any, handel: string): Model;
+  
+  /**
+   * Returns the key used by Box for storing the model for local persistence.
+   *
+   * return key The key used by Box when a model is boxed or set to auto-box. This key is used to store the model in whatever store Box is using for the current browser.
+   */
+  key(): string
 
-   /**
-    * Returns the number of items in a model if the model holds a collection. If the model holds a single object, this returns undefined. 
-    *
-    * return number The number of items in a model.
-    */
-   size(): number;
+  /**
+   * Returns the number of items in a model if the model holds a collection. If the model holds a single object, this returns undefined. 
+   *
+   * return number The number of items in a model.
+   */
+  size(): number;
 
-   /**
+  /**
    * This method returns the element at the position in the model indicated by the argument. This is a zero-based number.
    * If the model does not hold a collection but a single object, this returns undefined.
    * position amongst its siblings.
    *
    * @param number Index value indicating the node you wish to access from a collection. This is zero-based.
    */
-   eq(number: number): any;
+  eq(number: number): any;
 
-   /**
-    * The method lets you set a value on a property in an object in the model. If the property does not exist, it will be addded. Otherwise the property's current value will be replaced with the new value.
-    *
-    * @param propertyName The property to update.
-    * @param value The value to set to the property.
-    * @param doNotPropogate An optional true boolean. When present the model will not propagate its changes when they occur.
-    * @return void
-    */
-   setProp(propertyName: string, value: any, doNotPropogate?: boolean): void;
+  /**
+   * The method lets you set a value on a property in an object in the model. If the property does not exist, it will be addded. Otherwise the property's current value will be replaced with the new value.
+   *
+   * @param propertyName The property to update.
+   * @param value The value to set to the property.
+   * @param doNotPropogate An optional true boolean. When present the model will not propagate its changes when they occur.
+   * @return void
+   */
+  setProp(propertyName: string, value: any, doNotPropogate?: boolean): void;
 
-   /**
-    * Get the value of the provided property.
-    *
+  /**
+   * Get the value of the provided property.
+   *
    * @param doNotPropogate A boolean to controller change propagation.
-    * @return value The value of the property.
-    */
-   getProp(propertyName: string): any;
+   * @return value The value of the property.
+   */
+  getProp(propertyName: string): any;
 
-   /**
-    * When the model holds a single object, this method lets you do a wholesale replacement of the model's object with the one provided as an argument.
-    *
-    * @param object The object to replace the current object with.
-    * @return void
-    */
-   setObject(object: Object): void;
+  /**
+   * When the model holds a single object, this method lets you do a wholesale replacement of the model's object with the one provided as an argument.
+   *
+   * @param object The object to replace the current object with.
+   * @return void
+   */
+  setObject(object: Object): void;
 
-   /**
-    * When the model contains a single object, this method lets you merge an object with the model's current object so you can add multple property/value pairs in one pass.
-    *
-    * @param object The object to merge with the model's object.
-    * @return void
-    */
-   mergeObject(object: Object): void;
+  /**
+   * When the model contains a single object, this method lets you merge an object with the model's current object so you can add multple property/value pairs in one pass.
+   *
+   * @param object The object to merge with the model's object.
+   * @return void
+   */
+  mergeObject(object: Object): void;
 
-   /**
+  /**
    * This pushes the provided data onto the model when it is a collection.
    *
    * @param data The data to push on the the model.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   push(data: any, doNotPropogate?: boolean): void;
+  push(data: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * This pops the last item off of the model's collection.
    *
    * @param doNotPropogate A boolean to controller change propagation.
    * @return data The last item in the model's collection.
    */
-   pop(doNotPropogate?: boolean): any;
+  pop(doNotPropogate?: boolean): any;
 
-   /**
+  /**
    * This inserts the provided data at the beginning of a model's collection.
    *
    * @param data The data to insert at the beginning of the model's collection.
    * @return void
    */
-   unshift(data: any, doNotPropogate?: boolean): void;
+  unshift(data: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * This pops the first item off of the model's collection.
    *
    * @param doNotPropogate A boolean to controller change propagation.
    * @return data The first item of the model's collection
    */
-   shift(doNotPropogate?: boolean): any;
+  shift(doNotPropogate?: boolean): any;
 
-   /**
+  /**
    * Concatenate an array of data to the model's collection.
    *
    * @param data An array of data to add to the end of the model's collection.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   concat(data: any[], doNotPropogate?: boolean): void;
+  concat(data: any[], doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * Insert data into the provided position of the model's collection. If the position provided is greater than the number of items in the collection, the data will be push onto the end of the colleciton.
    *
    * @param data The data to insert.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   insert(position: number, data: any, doNotPropogate?: boolean): void;
+  insert(position: number, data: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * Remove all duplicates from the model's collection.
    *
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   unique(doNotPropogate?: boolean): void;
+  unique(doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * Get the index of an object in a collection based on a property and value.
    *
    * @param propertyName The property to search for.
    * @param value The value that the property must have.
    * @return number The zero-based position of the object.
    */
-   index(propertyName: string, value: any): number;
+  index(propertyName: string, value: any): number;
 
-   /**
+  /**
    * Performs a filter of the model's colleciton equivalent to the array function.
    *
    * @param
    * @return
    */
-   filter(callback: (value: any, index: number, array: any[]) => boolean, thisArg?: any): any[];
+  filter(callback: (value: any, index: number, array: any[]) => boolean, thisArg?: any): any[];
 
-   /**
+  /**
    *Performs a map of the model's colleciton equivalent to the array function.
    *
    * @param
    * @return
    */
-   map(callback: (value: any, index: number, array: any[]) => any, thisArg?: any): any[];
+  map(callback: (value: any, index: number, array: any[]) => any, thisArg?: any): any[];
 
-   /**
+  /**
    * Returns an array of objects of all the properties and their values that are in the model's collection.
    *
    * @param propertyName The name of the property to retrieve results for.
    * @return array An array of all the properties and their values in the model.
    */
-   pluck(propertyName: string): any[];
+  pluck(propertyName: string): any[];
 
-   /**
+  /**
    * Performs a sort of the model's colleciton equivalent to the array function.
    *
    * @param start A number indicating the start position.
@@ -2326,105 +2330,104 @@ interface Stack {
    * @param item Optional items to insert.
    * @return
    */
-   sort(start: number, deleteCount?: number, ...item: any[]): void;
+  sort(start: number, deleteCount?: number, ...item: any[]): void;
 
-   /**
+  /**
    * Reverses the order of the model's collection.
    *
    * @return void
    */
-   reverse(): void;
+  reverse(): void;
 
-   /**
+  /**
    * This method takes a comma separated list of properties by which to sort the model's collection. If a property is preceded by a hyphen the sort order is descending, otherwise it is ascending.
    *
    * @return void
    */
-   sortBy(...property: any[]): void;
+  sortBy(...property: any[]): void;
 
-   /**
+  /**
    * The method lets you delete the property of an object when the model holds a single object, or, if a number is provided, it deletes the object at that location in the model's collection. The number is zero-based.
    *
    * @param item The item or index position.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   delete(item: any, doNotPropogate?: boolean): void;
+  delete(item: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * This method lets you run a callback that gets the model's collection as its argument.
    *
    * @param callback A callback to execute.
    * @return void
    */
-   run(callback: (data: any) => void): void;
+  run(callback: (data: any) => void): void;
 
-   /**
+  /**
    * This method forces the model to propagate its current state so that any mediators or dispatch receivers can intercept it.
    *
    * @return void
    */
-   poke(): void;
+  poke(): void;
 
-   /**
-   * Get the handle the model is using.
+  /**
+   * This the handle the model is using.
    *
-   * @return string
    */
-   getHandle(): string;
+  handle: string;
 
-   /**
+  /**
    * This lets you set the handle the model uses when it propagates its changes. This allows you to change which mediators and dispatch receivers are reacting to the model's changes.
    *
    * @param handle A string defining a new handle for the model.
    * @return void
    */
-   setHandle(handle: string): void;
+  setHandle(handle: string): void;
 
-   /**
+  /**
    * This method deletes all data from the model. In the case of a model with a single object, the object is reduced to {}. In the case of a collection, it is reduced to [].
    *
    * @return void
    */
-   purge(): void;
+  purge(): void;
 
-   /**
+  /**
    * Check whether the model has any data. This works for models with single objects or collections.
    *
    * @return boolean
    */
-   hasData(): boolean;
+  hasData(): boolean;
 
-   /**
+  /**
    * This lets you check what type of model you are dealing with. If the model holds an object, this returns 'object'. If it holds a collection, it returns 'array'.
    *
    * @return string
    */
-   getType(): string;
+  getType(): string;
 
-   /**
+  /**
    *  Lets you check whether the model is a collection that is iterable or not. If the collection is empty or it is an object, this will return false.
    *
    * @return boolean
    */
-   isIterable(): boolean;
+  isIterable(): boolean;
 
-   /**
+  /**
    * Performs a forEach loop equivalent to the array function with context first and index last.
    *
    * @param callback A callback to execute.
    * @return void
    */
-   forEach(callback: (context: any, index: number) => any): void;
+  forEach(callback: (context: any, index: number) => any): void;
 
-   /**
+  /**
    * This method returns whatever data the model holds. This could be an object or an array.
    *
    * @return any Whatever data the model holds.
    */
-   getData(): any;
+  getData(): any;
 
-   /**
+  /**
    *  This method lets you set the value of a property on the model's object. When the holds a single object, this is equivalent to `model.setProp(propertyName, value)`. If the property does not exist on the object, it will be created. If the property already exists, its value will be replaced by the value provided.
    *
    * @param propertyName The property whose value you want to set.
@@ -2432,27 +2435,27 @@ interface Stack {
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   setItemProp(propertyName: string, value: any, doNotPropogate?: boolean): void;
+  setItemProp(propertyName: string, value: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    *  This method lets you set the value of a property on an object in a model's collection. To do so you must provide an index position for the object in the colleciton. If the property does not exist on the object at that index, it will be created, otherwise its value will be updated to the value provided.
    *
    * @param
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   setItemProp(index: number, propertyName: string, value: any, doNotPropogate?: boolean): void;
+  setItemProp(index: number, propertyName: string, value: any, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * This method lets you get the value of the model's object.
    *
    * @param propertyName The property whose value you want to retrieve.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return value The value of the property.
    */
-   getItemProp(propertyName: string): any;
+  getItemProp(propertyName: string): any;
 
-   /**
+  /**
    * This method lets you get the value of a propert from an object at the index position your provided in the model's collection.
    *
    * @param index The index position of the object whose property you want to retrieve.
@@ -2460,18 +2463,18 @@ interface Stack {
    * @param doNotPropogate A boolean to controller change propagation.
    * @return value The value of the property.
    */
-   getItemProp(index: number, propertyName: string): any;
+  getItemProp(index: number, propertyName: string): any;
 
-   /**
+  /**
    * This method allows you to delete an item from the model's collection based on the index of the object.
    *
    * @param index A number indicated the zero-based position of the object your wish to delete.
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   deleteItemProp(index: number, doNotPropogate?: boolean): void;
+  deleteItemProp(index: number, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * This method allows you to delete a property from an item at the designated position in the model's collection.
    *
    * @param index Position of the object in the model's colleciton.
@@ -2479,22 +2482,22 @@ interface Stack {
    * @param doNotPropogate A boolean to controller change propagation.
    * @return void
    */
-   deleteItemProp(index: number, propertyName: string, doNotPropogate?: boolean): void;
+  deleteItemProp(index: number, propertyName: string, doNotPropogate?: boolean): void;
 
-   /**
+  /**
    * Find out when the modle was last changed.
    *
    * @return string A Unix timestamp indicating the last time the model was changed.
    */
-   getLastModTime(): string;
+  getLastModTime(): string;
 
-   /**
+  /**
    * This method lets you store the model in Truck's Box for local data persistence. It takes an object of three arguments: { key: "my-key", boxName: "my-data-store" }. The key is used as the key in the data store for retrieving later. The boxName is the name for the data store.
    *
    * @param options And object of the following key/value pairts to box the model.
    * @return void
    */
-   box(options: {
+  box(options: {
       autobox: boolean;
       boxName: string;
       key: string;
@@ -2502,53 +2505,96 @@ interface Stack {
 
    }): void;
 
-   /**
+  /**
    * This method tells Truck to automatically store any changes to the model in its Box for local data persistence.
    *
    * @return void
    */
-   setToAutobox(options: {
+  setToAutobox(options: {
       autobox: boolean;
       boxName: string;
       key: string;
       name: string;
    }): void;
 
-   /**
+  /**
    * This method tests whether the model has been boxed or saved in Truck's local data persistence Box.
    *
    * @return boolean
    */
-   isBoxed(): boolean;
+  isBoxed(): boolean;
 
-   /**
+  /**
    * This method tests whether the model is set to automatically persist its state in Truck's Box for local data persistence.
    *
    * @return boolean
    */
-   isAutoBoxed(): boolean;
+  isAutoBoxed(): boolean;
 
-   /**
+  /**
    * Get the last time the model was stored in Truck's Box for local data persistence. 
    *
    * @return string A unix timestamp.
    */
-   getLastBoxTime(): string;
- }
+  getLastBoxTime(): string;
+}
 
- /**
-  * Interface for View
-  */
+/**
+ * Interface for View
+ */
 interface View {
 
   /**
-   * Render a view with the provided data. If the append true boolean is provided, the data will be rendered and appended to the view.
+   * This method create a View object.
+   *
+   * options An object of key/value pairs to initialize the view.
+   * @return View A View object.
+   */
+  new (options: {
+    element: string;
+    template?: string;
+    noTemplate?: boolean;
+    model?: Model;
+    variable?: string;
+    events?: any[];
+    startIndexFrom?: number;
+    escapeHTML?: boolean;
+  }): View;
+
+  /**
+   * Render a view with the provided data. If the append true boolean is provided, the data will be rendered and appended to the view. If no data is provided and the view is bound to a model, it will render with the model.
    *
    * @param data The data to render the view with.
    * @param append A boolean to determine whether to append the rendered data to the view or rerender the view with the full set of data.
    * @return void
    */
-  render(data: any, append?: boolean): void;
+  render(data?: any, append?: boolean): void;
+
+  /**
+   * This method is used internally by Truck Views to convert a template into a function that returns DOM nodes with the provided data.
+   * 
+   * @param template A string defining a template to parse.
+   * @param variable An optional variable to use for interpolation inside a template.
+   * @return Function A factory function that creates DOM nodes.
+   */
+  parseView(template: string, variable?: string): Function;
+
+  /**
+   * This method is used internally by Truck Views to register events on the View's element.
+   */
+  handleEvents(): void;
+
+  /**
+   * This method is used internally by Truck Views to extract a template from the element the view is bound to.
+   */
+  extractTemplate(): void;
+
+  /**
+   * This method is used internally by Truck Views. It is the result of the `parseView` method. It is a factory function that returns DOM nodes from a template.
+   * 
+   * 
+   */
+  parsedTemplate: Function;
 
   /**
    * Delete all of the view's content from the DOM.
@@ -2577,22 +2623,14 @@ interface View {
    *
    * @return string The template used by the view.
    */
-  getTemplate(): string
+  template(): string
 
   /**
-   * Set a template on the view. If the view already has a template, it will be replaced with this one.
+   * The model the view is bound to.
    *
-   * @param teplate A string defining a template for the view.
-   * @return void
+   * @return Model
    */
-  setTemplate(template: string): void;
-
-  /**
-   * Returns the name of the model the view is bound to.
-   *
-   * @return string
-   */
-  getModel(): string;
+  model: Model;
 
   /**
    * This tells truck what model the view should be rendered with.
@@ -2603,18 +2641,25 @@ interface View {
   setModel(model: Model): void;
 
   /**
-   * Get the mediator a view is being rendered by if it is bound to a model
+   * The mediator a view is being rendered by if it is bound to a model.
    *
-   * @return string The mediator associated with the view.
+   * @return Mediator The mediator associated with the view.
    */
-  getMediator(): string;
+  mediator: Mediator;
 
   /**
    * Check whether the view has been rendered.
    *
    * @return boolean
    */
-  isRendered(): boolean;
+  rendered: boolean;
+
+  /**
+   * A boolean indicating whether a view can be rendered or not. This value gets set by stop or any other factors that would prevent the view from rendering properly.
+   *
+   * @return boolean
+   */
+  canRender: boolean;
 
   /**
    * Check whether the view is empty or not.
@@ -2648,14 +2693,14 @@ interface View {
   addEvent(events: { element: string | Element | DOMStack, event: string, callback: (event?: Event) => void }, replace?: boolean): void;
 
   /**
-   * Remove all events form the view.
+   * Remove all events from the view.
    *
    * @return void
    */
   off(): void;
 
   /**
-   * This
+   * This method inbinds events from the view.
    *
    * @param event The event to remove.
    * @param element The element the event is bound to.
@@ -2665,16 +2710,16 @@ interface View {
   off(event: string, element?: string | Element, callback?: Function): void;
 
   /**
-   * Get a reference to the element the view is registered to.
-   *
-   * @return parent The parent element the view is bound to.
+   * A reference to the element the view is registered to This is a DOMStack. Use `setElement` to change what element a view is using.
    */
-  getElement(): Truck;
+  element: Truck;
 
   /**
+   * A method to set the element to which a view instance is bound. This will be the element into which templates are rendered or events are attached.
    *
-   *
-   * @param element 
+   * @param string A valid CSS selector.
+   * @param Element A DOM node. 
+   * @param DOMStack A Truck DOMStack.
    * @return void
    */
   setElement(element: string | Element | DOMStack): void;
@@ -2692,13 +2737,6 @@ interface View {
    * @return void
    */
   stop(after: number): void;
-
-  /**
-   * Check whether a view has been stopped.
-   *
-   * @return boolean
-   */
-  isStopped(): boolean;
 
   /**
    * Tell a stopped view that it can begin responding to render commands again.
@@ -2746,38 +2784,35 @@ interface View {
   stopRenderViewEvery(): void;
 
   /**
-   * Find out when the view was last rendered.
+   * This property indicates the last time a view was rendered. If it has not been rendered, it will be undefined. It is a Unix timestamp.
    *
    * @return string A Unix timestamp
    */
-  getLastRenderTime(): string;
+  lastRenderTime: string;
 
   /**
-   * Tell the view to escape all HTML elements. By default Truck does not escpate HTML code. You can also set the view up to automatically escape HTML at initialization time with the property `escapeHTML` set to true.
+   * This property indicates whether Truck Views will escape html in data being rendered or not. By default Truck does not escpate HTML code. Setting this to true will cause Truck to escape all HTML the next time the view renders. You can also set the view up to automatically escape HTML at initialization time with the property `escapeHTML` set to true.
    *
-   * @return void
    */
-  escapeHTML(): void;
+  escapeHTML: boolean;
 
   /**
-   * Find out whether a view is escaping HTML when it renders data.
-   *
-   * @return boolean
+   * This property indicates how many times the view has rendered.
    */
-  isEscapingHTML(): boolean;
-
-  /**
-   * Find out how many times the view has rendered.
-   *
-   * @return number
-   */
-  getRenderCount(): number;
+  renderCount: number;
 }
 
 /**
- * Interface for Router
- */
+  * Interface for Router
+  */
 interface Router {
+  
+  /**
+   * This method create a Router instance.
+   *
+   * @return: Router An instance of the Router class.
+   */
+  new (): Router;
 
   /**
    * Setup up a route. This takes two arguments: the route and a callback to execute when the route is dispatched. You can provide an ID for a route using a colon: route: 'myroute:UniqueID'.
@@ -2794,21 +2829,21 @@ interface Router {
    *
    * @return string The current full route. Routes are separated by forward slashes '/'.
    */
-  getFullRoute(): void;
+  getFullRoute(): string;
 
   /**
    * Get an array of the current routes.
    *
    * @return stack An array of the current routes.
    */
-  getRoutesStack(): void;
+  getRoutesStack(): Stack;
 
   /**
    * Get the current route. This will be identical to the current screen, etc.
    *
    * @return string The current route.
    */
-  getCurrentLoc(): void;
+  getCurrentLoc(): string;
 
   /**
    * This method lets you dispatch a route. You can include an ID for the router to handle by putting it after a color: $.dispatch('myRoute:UniqueID').
@@ -2831,7 +2866,7 @@ interface Router {
    *
    * @return The last item from the $.TruckRoutes model.
    */
-  popRoute(): void;
+  popRoute(): string;
 
   /**
    * Insert a route at the beginning of the $.TruckRoutes model. If you do this, you'll need to update the state of the affected screens, changing their current status, etc.
@@ -2845,7 +2880,7 @@ interface Router {
    *
    * @return route A string defining the removed route.
    */
-  shiftRoute(): void;
+  shiftRoute(): string;
 
   /**
    * This method lets you insert a route at the specified location in the $.TruckRoutes model.
@@ -2888,10 +2923,9 @@ interface Router {
   delete(route: string, baseRouteOnly: boolean): void;
 }
 
-
 /**
- * Represents the completion of an asynchronous operation
- */
+  * Represents the completion of an asynchronous operation
+  */
 interface Promise<T> {
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -2982,8 +3016,8 @@ interface PromiseConstructor {
 }
 
 /**
- * Ambient declarations:
- */
+  * Ambient declarations:
+  */
 declare var Promise: PromiseConstructor;
 declare type ByteString = string;
 declare type USVString = string;
@@ -3260,8 +3294,8 @@ interface TruckStatic {
   Block(opacity: string): void;
   
   /**
-   * This removes any currently displayed mask.
-   */
+  * This removes any currently displayed mask.
+  */
   Unblock(): void;
   
   /**
@@ -3295,7 +3329,10 @@ interface TruckStatic {
   /**
    * Get the currently selected button. This reutrns a zero-based number.
    */
-    getSelection(): number;
+    getSelection(): {
+        index: number;
+        element: Truck;
+    };
   };
   
   /**
@@ -3415,3 +3452,9 @@ declare var DOMStack: any;
 declare var TruckJS: TruckStatic;
 declare var $: TruckStatic;
 declare var fetch: fetch;
+declare var Stack: Stack;
+declare var Model: Model;
+declare var Mediator: Mediator
+declare var View: View;
+declare var Component: Component;
+declare var Router: Router;

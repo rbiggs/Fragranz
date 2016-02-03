@@ -485,7 +485,7 @@
   $.extend({
     lib: "TruckJS",
 
-    version: '1.0.0-beta.6',
+    version: '1.0.0-beta.9',
 
     noop: function() {},
 
@@ -629,6 +629,24 @@
           if (callback.call(obj[key], key, obj[key]) === false) return obj;
         }
       }
+    },
+
+    unique: function(array) {
+      if (!array || !Array.isArray(array)) return;
+      var len = array.length;
+      var obj = {};
+      var ret = [];
+      for (var i = 0; i < len; i++) {
+        var arrayItem = JSON.stringify(array[i]);
+        var arrayItemValue = array[i];
+        if (obj[arrayItem] === undefined) {
+          ret.push(arrayItemValue);
+          obj[arrayItem] = 1;
+        } else {
+          obj[arrayItem]++;
+        }
+      }
+      return ret
     }
   });
 })();
@@ -3540,7 +3558,7 @@
       var parsedTemplate;
 
       var parseView = function(template, variable) {
-        var interpolate = /\$\{([\s\S]+?)\}/img;
+        var interpolate = /\{=([\s\S]+?)\}/img;
         variable = variable || 'data';
         template.replace("'", "\'");
         /* jshint ignore:start */
@@ -7561,8 +7579,6 @@
       };
     }
 
-    function anim() {}
-
     $.extend({
       anim: (function() {
 
@@ -9537,6 +9553,7 @@
         var segmented;
         var labels = (settings.labels) ? settings.labels : [];
         var __selection;
+        var __element;
 
         function createSegmentedButton() {
           var __segmented = ['<div class="segmented">'];
@@ -9554,6 +9571,7 @@
           __segmented.push('</div>');
           segmented = __segmented.join('');
           $(settings.element).append(segmented);
+          if (__selection) __element = $(settings.element).find('button').eq(__selection)
         }
         createSegmentedButton();
 
@@ -9565,13 +9583,17 @@
           $this.siblings('button').removeAttr('aria-checked');
           $this.addClass('selected');
           __selection = $this.index();
+          __element = $(this);
           $this.attr('aria-checked', true);
           callback.call(this, e);
         });
 
         return {
           getSelection: function() {
-            return __selection
+            return {
+              index: __selection,
+              element: __element
+            }
           }
         }
       }
